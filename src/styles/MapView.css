@@ -1,0 +1,10 @@
+.main-content {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  
+  .map-container {
+    grid-row: 2;
+    height: 100%;
+  }
