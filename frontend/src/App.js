@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import SpaceManager from './pages/SpaceManager';
 import ConfigSimulator from './pages/ConfigSimulator';
 import RealTimeMonitor from './pages/RealTimeMonitor';
+import EditablePolygon from './components/MapEditor';
 
 function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Estado para controlar la visibilidad del Sidebar
@@ -19,7 +20,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/manager" element={<SpaceManager />} />
-            <Route path="/simulator" element={<ConfigSimulator />} />
+            <Route path="/simulator" element={<EditablePolygon />} />
             <Route path="/monitor" element={<RealTimeMonitor />} />
           </Routes>
         </div>

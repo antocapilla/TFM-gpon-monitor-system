@@ -6,9 +6,63 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import ontIcon from '../assets/icono-ont.png';
 import { point, lineString, polygon } from '@turf/helpers';
-import { Marker, Polyline, Polygon } from 'react-leaflet';
+import { Marker, Polyline, Polygon, GeoJSON } from 'react-leaflet';
 import { useLeafletContext } from '@react-leaflet/core'
 import FileUpload from './FileUpload';
+import floorPlanUrl1 from '../assets/edificioA/planta2.png'
+
+const geoJSON = {
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Ubicación de ejemplo",
+        "popupContent": "Esta es una ubicación de punto de ejemplo."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-3, 40] // Coordenadas de Madrid, España
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Área de ejemplo",
+        "popupContent": "Este es un polígono de ejemplo que representa un área."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [1736, 528.9832831210665],
+            [1712, 2503.8503247129925],
+            [448, 2375.9237147313293]
+          ]
+        ]
+      }
+    }
+  ]
+}
+
+const polygonGeoJSON = {
+  "type": "Feature",
+  "properties": {
+    "name": "Área de ejemplo",
+    "popupContent": "Este es un polígono de ejemplo que representa un área."
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [1736, 528.9832831210665],
+        [1712, 2503.8503247129925],
+        [448, 2375.9237147313293]
+      ]
+    ]
+  }
+}
+
 
 const MyFeatureGroup = ({ drawings, addDrawing, updateDrawing, deleteDrawing }) => {
   const featureGroupRef = useRef();
@@ -102,6 +156,7 @@ const MyFeatureGroup = ({ drawings, addDrawing, updateDrawing, deleteDrawing }) 
         }
         return null;
       })}
+
       <EditControl
         position="topright"
         draw={{
@@ -159,7 +214,7 @@ const MapViewEditor = ({floorPlanUrl}) => {
     if (floorPlanUrl) {
       // Cargar el mapa usando floorPlanUrl
       const img = new Image();
-      img.src = floorPlanUrl;
+      img.src = floorPlanUrl1;
       img.onload = () => {
         setImageDimensions({ width: img.width, height: img.height });
         const ratio = img.width / img.height;
@@ -209,7 +264,7 @@ const MapViewEditor = ({floorPlanUrl}) => {
         crs={L.CRS.Simple}
       >
         <ImageOverlay
-          url={floorPlanUrl}
+          url={floorPlanUrl1}
           bounds={bounds}
         />
         <MyFeatureGroup
