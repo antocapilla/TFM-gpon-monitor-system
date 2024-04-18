@@ -7,6 +7,8 @@ from abc import ABC, abstractmethod
 from pyqtree import Index
 from pygame.locals import *
 from scipy.constants import mu_0, epsilon_0, pi
+import copy
+import cmath
 
 # Definir constantes de colores
 BLACK = (0, 0, 0)
@@ -79,17 +81,29 @@ class Collision:
         self.point = point
         self.wall = wall
         self.ray = ray
+    
+    def __repr__(self) -> str:
+        return f"Collision: Point ('{self.point}')"
 
 class Ray(Visualizable):
-    def __init__(self, start_point, direction, polarization="TE"):
+    def __init__(self, start_point, direction, polarization="TE", power=1.0):
         self.start_point = start_point
         self.direction = direction
         self.end_point = None
         self.polarization = polarization
-        # self.power = power
-        self.path = []
+        self.alpha = 1 + 0j
+        self.power = power
+        self.path_loss = 0  # Pérdida de trayectoria acumulada
+        self.path = [start_point]
         self.num_reflections = 0
         self.num_transmissions = 0
+        self.reflection_prod = 1 + 0j  # Producto de los coeficientes de reflexión
+        self.transmission_prod = 1 + 0j  # Producto de los coeficientes de transmisión
+        self.distance = 0  # Distancia total recorrida por el rayo
+        self.total_delay = 0  # Retardo total del rayo
+
+    def __repr__(self):
+        return f"Ray: Position ('{self.start_point}', {self.end_point}) Path: ('{self.path}'); Reflections and transmisions: ('{self.num_reflections}',''{self.num_transmissions})"
 
     def collide(self, wall):
         # based off line segment intersection formula found at https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection
@@ -127,34 +141,103 @@ class Ray(Visualizable):
             return False
 
     def visualize(self, display, scale):
-        if self.end_point is not None:
-            start_point_scaled = (int(self.start_point[0] * scale[0]), int(self.start_point[1] * scale[1]))
-            end_point_scaled = (int(self.end_point[0] * scale[0]), int(self.end_point[1] * scale[1]))
-            pygame.draw.line(display, RAYS, start_point_scaled, end_point_scaled)
+        if len(self.path) > 1:
+            points_scaled = [(int(point[0] * scale[0]), int(point[1] * scale[1])) for point in self.path]
+            pygame.draw.lines(display, RAYS, False, points_scaled)  # Dibujar la trayectoria completa
         else:
-            print("endpoint None")
+            print("Not enough points to draw the ray path")
+            print(self.path)
+
+    # def visualize(self, display, scale):
+    #     if self.start_point and self.end_point is not None:
+    #         start_point_scaled = (int(self.start_point[0] * scale[0]), int(self.start_point[1] * scale[1]))
+    #         end_point_scaled = (int(self.end_point[0] * scale[0]), int(self.end_point[1] * scale[1]))
+    #         pygame.draw.line(display, RAYS, start_point_scaled, end_point_scaled)
+    #     else:
+    #         print("endpoint None")
 
 class ReceiverGrid(Visualizable):
     def __init__(self, dimensions, resolution):
         self.dimensions = dimensions
         self.resolution = resolution
         self.grid = self.initialize_grid()
+        self.cell_size = self.dimensions[0] / self.resolution  # Tamaño de la celda de la cuadrícula
+        self.received_power = np.zeros_like(self.grid[0])
 
     def initialize_grid(self):
         x = np.linspace(0, self.dimensions[0], self.resolution)
         y = np.linspace(0, self.dimensions[1], self.resolution)
         grid = np.meshgrid(x, y)
         return grid
+    
+    def get_rays_in_cell(self, cell_coords):
+        cell_bbox = (cell_coords[0], cell_coords[1], cell_coords[0] + self.cell_size, cell_coords[1] + self.cell_size)
+        return self.simulator.quadtree.intersect(cell_bbox)  # Obtener los rayos que intersectan la celda
 
-    def visualize(self, display):
-        pass
+    def register_rays(self):
+        for i in range(self.resolution):
+            for j in range(self.resolution):
+                cell_coords = (i * self.cell_size, j * self.cell_size)
+                rays_in_cell = self.get_rays_in_cell(cell_coords)
+                
+                received_power = self.calculate_received_power(rays_in_cell, frecuency=2.4e9)
+                self.received_power[j, i] += 10**(received_power / 10)
+    
+    def calculate_received_power(self, rays, frequency, calculation_point):
+        # Velocidad de la luz (m/s)
+        c = 3e8
+
+        # Frecuencia angular
+        omega = 2 * np.pi * frequency
+
+        # Inicializar la potencia recibida total
+        total_power = 0
+
+        # Iterar sobre cada rayo
+        for ray in rays:
+            # Calcular la distancia desde el punto final del rayo hasta el punto de cálculo
+            distance = math.dist(ray.end_point, calculation_point)
+
+            # Calcular el retardo de propagación desde el punto final del rayo hasta el punto de cálculo
+            delay = distance / c
+
+            # Calcular el término exponencial
+            exp_term = cmath.exp(1j * omega * delay)
+
+            # Calcular la corrección de amplitud compleja
+            correction_factor = distance * exp_term
+
+            # Aplicar la corrección a la amplitud compleja del rayo
+            corrected_alpha = ray.alpha * correction_factor
+
+            # Calcular la potencia del rayo utilizando la amplitud compleja corregida
+            ray_power = abs(corrected_alpha) ** 2
+
+            # Sumar la potencia del rayo a la potencia total recibida
+            total_power += ray_power
+
+        return total_power
+
+
+    def visualize(self, display, scale):
+        return super().visualize(display, scale)
+        
+    # def plot(self):
+    #     fig, ax = plt.subplots()
+    #     im = ax.imshow(self.received_power, cmap='viridis', origin='lower', extent=[0, self.dimensions[0], 0, self.dimensions[1]])
+    #     ax.set_xlabel('X (m)')
+    #     ax.set_ylabel('Y (m)')
+    #     ax.set_title('Received Power (dBm)')
+    #     fig.colorbar(im, ax=ax, label='Received Power (dBm)')
+    #     plt.show()
 
 class Simulator:
-    def __init__(self, environment, tx_antenna, rx_grid, num_rays, max_reflections, max_transmissions):
+    def __init__(self, environment, tx_antenna, rx_grid, num_rays, min_power, max_reflections, max_transmissions):
         self.environment = environment
         self.tx_antenna = tx_antenna
         self.rx_grid = rx_grid
         self.num_rays = num_rays
+        self.min_power = min_power
         self.max_reflections = max_reflections
         self.max_transmissions = max_transmissions
         self.rays = []
@@ -163,41 +246,20 @@ class Simulator:
 
     def launch_rays(self):
         self.rays = []
+        self.quadtree = Index(bbox=(0, 0, self.environment.dimensions[0], self.environment.dimensions[1]))  # Reiniciar el Quadtree
         rays = self.tx_antenna.launch_rays(self.num_rays)
-
         for ray in rays:
             self.propagate_ray(ray)
         
-        return self.rays  # Devolver la combinación de rayos originales y reflejados
- 
-
-    def propagate_ray(self, ray):
-        # Calcular la siguiente colision
-        collision = self.find_closest_collision(ray)
-
-        if (ray.num_reflections > self.max_reflections or ray.num_transmissions > self.max_transmissions): # Hardcode: deberia de ser en funcion de la amplitud del rayo
-            self.rays.append(ray)
-            return # End propagation
-
-        if collision:
-            # Logica de propagacion
-            
-            # Calcula el rayo reflejado
-            reflected_ray = self.reflect_ray(ray, collision)
-            # Propagar el rayo reflejado
-            self.propagate_ray(reflected_ray)
-            
-            # Manipula el rayo original para representar la transmisión y calcula el rayo reflectado
-            self.refract_ray(ray, collision)
-            # Propagar el rayo transmitido
-            self.propagate_ray(ray)
-        else:
-            return
+        print(len(self.rays))
+        return self.rays
 
     def find_closest_collision(self, ray):
+        obstacles = self.environment.obstacles
+
         closest_collision = None
         closest_distance = 1000
-        for obstacle in self.environment.obstacles:
+        for obstacle in obstacles:
             collision = ray.collide(obstacle)
             if collision:
                 distance = math.dist(ray.start_point, collision.point)
@@ -206,9 +268,62 @@ class Simulator:
                     closest_collision = collision
         if closest_collision:
             ray.end_point = closest_collision.point
-            ray.path.append(ray.end_point)
+            # ray.path.append(ray.end_point)
             return closest_collision
             
+    def propagate_ray(self, ray):
+        # Verificar si la potencia del rayo está por debajo del umbral
+        # if ray.num_reflections > self.max_reflections or ray.num_transmissions > self.max_transmissions:
+        #     return
+
+        power = abs(ray.alpha)**2
+        if ray.num_reflections > self.max_reflections or ray.num_transmissions > self.max_transmissions: #or power < self.min_power:
+            return
+
+        # Calcular la siguiente colisión
+        collision = self.find_closest_collision(ray)
+
+        if collision:
+            # Actualziar el rayo original con la distancia y el retardo
+            distance = math.dist(ray.start_point, collision.point) 
+            ray.alpha *= self.calculate_complex_amplitude(distance, tx_antenna.frequency)
+            ray.end_point = collision.point
+
+            # Calcular y propagar el rayo reflejado
+            reflected_ray = self.reflect_ray(ray, collision)
+            self.propagate_ray(reflected_ray)
+
+            # Calcular y propagar el rayo refractado
+            refracted_ray = self.refract_ray(ray, collision)
+            self.propagate_ray(refracted_ray)
+            self.rays.append(ray) # Agrega el rayo original al final
+            # print(ray.start_point, ray.end_point)
+            # self.quadtree.insert(ray, (ray.start_point[0], ray.start_point[1], ray.end_point[0],ray.end_point[1])) # Agrega el rayo refractado al final
+        else:
+            # Insertar el rayo en el Quadtree al final de su propagación
+            # self.quadtree.insert(ray, ray.end_point)
+            self.rays.append(ray)
+    
+    def calculate_complex_amplitude(self, distance, frequency):
+        # Speed of light in air (m/s)
+        speed_of_light = 299792458
+        
+        # Calculate the propagation delay of the segment
+        delay = distance / speed_of_light
+        
+        # Calculate the angular frequency
+        omega = 2 * cmath.pi * frequency
+        
+        # Calculate the free-space path loss attenuation
+        attenuation = 1 / distance
+        
+        # Calculate the phase shift
+        phase_shift = cmath.exp(-1j * omega * delay)
+        
+        # Calculate the complex amplitude of the segment
+        complex_amplitude = attenuation * phase_shift
+        
+        return complex_amplitude
 
     def reflect_ray(self, ray, collision):
         # Calcular el vector normal de la pared en el punto de colisión
@@ -233,13 +348,25 @@ class Simulator:
             ray.direction[1] - 2 * np.dot(ray.direction, normal) * normal[1]
         )
 
-        # Crear el nuevo rayo reflejado
-        reflected_ray = Ray(collision.point, reflected_direction)
-        reflected_ray.num_reflections = ray.num_reflections + 1
-        reflected_ray.num_transmissions = ray.num_transmissions
-        reflected_ray.path = ray.path
+        # Actualizar el rayo original para representar la reflexión
+        reflected_ray = copy.deepcopy(ray)
+        reflected_ray.distance += math.dist(ray.start_point, collision.point)
+        reflected_ray.start_point = collision.point
         reflected_ray.path.append(collision.point)
-        # reflected_ray.power = ray.power * abs(reflection_coefficient)**2
+        reflected_ray.direction = reflected_direction
+        reflected_ray.alpha *= reflection_coefficient
+        reflected_ray.num_reflections += 1
+
+        # print(reflection_coefficient)
+
+
+
+        # reflected_ray.path_loss += 20 * math.log10(abs(reflection_coefficient))
+        # reflected_ray.path.append(collision.point)  # Agregar el punto de colisión a la trayectoria
+        # reflected_ray.reflection_prod *= reflection_coefficient
+
+        # reflected_ray.total_distance += math.dist(ray.start_point, collision.point)
+        # reflected_ray.total_delay += reflected_ray.total_distance / 3e8
 
         return reflected_ray
 
@@ -269,15 +396,31 @@ class Simulator:
             math.sin(refracted_angle) * normal[0] + math.cos(refracted_angle) * normal[1]
         )
 
-        # Crear el nuevo rayo refractado
-        refracted_ray = Ray(collision.point, refracted_direction)
-        ray.end_point = collision.point
+        
+
+        # Crear el rayo transmitido
+        # refracted_ray = copy.deepcopy(ray)
         ray.path.append(collision.point)
+        ray.start_point = collision.point
+        ray.alpha *= transmission_coefficient
         ray.num_transmissions += 1
+        
+        # ray.path.append(ray.start_point)
+        # ray.start_point = collision.point
+        # ray.end_point = None
+        # ray.alpha *= transmission_coefficient
+        # print(transmission_coefficient)
 
-        # refracted_ray.power = ray.power * abs(transmission_coefficient)**2
+        # # Actualizar el rayo original para representar la transmisión
+        # ray.start_point = collision.point
+        # # ray.direction = refracted_direction
+        # ray.path_loss += 20 * math.log10(abs(transmission_coefficient))
+        # ray.path.append(collision.point)  # Agregar el punto de colisión a la trayectoria
+        # ray.transmission_prod *= transmission_coefficient
+        # ray.total_distance += math.dist(ray.start_point, collision.point)
+        # ray.total_delay += ray.total_distance / 3e8
 
-        return refracted_ray
+        return ray
     
     def calculate_reflection_coefficient_TE(self, incident_angle, material):
         epsilon_r = material.permittivity
@@ -336,6 +479,49 @@ class Simulator:
         refracted_angle = np.arcsin(np.sin(incident_angle) / eta.real)
 
         return refracted_angle
+
+    def generate_contour_map(self):
+        for i in range(self.rx_grid.resolution):
+            for j in range(self.rx_grid.resolution):
+                cell_coords = (i * self.rx_grid.cell_size, j * self.rx_grid.cell_size)
+                cell_bbox = (cell_coords[0], cell_coords[1], cell_coords[0] + self.rx_grid.cell_size, cell_coords[1] + self.rx_grid.cell_size)
+                rays_in_cell = self.quadtree.intersect(cell_bbox)
+                
+                # Calcular el punto de cálculo para la celda actual
+                calculation_point = (cell_coords[0] + self.rx_grid.cell_size / 2, cell_coords[1] + self.rx_grid.cell_size / 2)
+                
+                received_power = self.rx_grid.calculate_received_power(rays_in_cell, frequency=2.4e9, calculation_point=calculation_point)
+                
+                # Agregar una pequeña constante al valor de received_power antes de calcular el logaritmo
+                received_power_dbm = 10 * math.log10(received_power + 1e-12) + 30  # Convertir a dBm
+                
+                self.rx_grid.received_power[j, i] = received_power_dbm
+        
+        self.plot()
+
+    def plot(self):
+        fig, ax = plt.subplots(figsize=(8, 4.8))
+        X, Y = self.rx_grid.grid
+        contour = ax.contourf(X, Y, self.rx_grid.received_power, cmap='RdYlGn')
+        fig.colorbar(contour, ax=ax, label='Potencia de señal recibida (dBm)')
+        
+        ax.plot(self.tx_antenna.location[0], self.tx_antenna.location[1], 'ro', markersize=10, label='Antena transmisora')
+        
+        for obstacle in self.environment.obstacles:
+            start_x = obstacle.start_point[0]
+            start_y = obstacle.start_point[1]
+            end_x = obstacle.end_point[0]
+            end_y = obstacle.end_point[1]
+            ax.plot([start_x, end_x], [start_y, end_y], 'k-', linewidth=2)
+        
+        ax.set_xlim(0, self.environment.dimensions[0])
+        ax.set_ylim(0, self.environment.dimensions[1])
+        ax.set_xlabel('Distancia (m)')
+        ax.set_ylabel('Distancia (m)')
+        ax.set_title('Mapa de calor de la señal de RF con obstáculos')
+        ax.legend()
+        fig.tight_layout()
+        plt.show()
 
     def update_tx_position(self, new_position):
         self.tx_antenna.location = new_position
@@ -427,9 +613,7 @@ def initializeBorders(width, height):
 
     return walls
 
-import random
-
-def create_random_walls(width, height, num_walls=10, min_wall_height=50, min_wall_distance=20):
+def create_random_walls(width, height, num_walls=20, min_wall_height=50, min_wall_distance=20):
     walls = []
     material = Material(2.8, 0.0001, 5)
 
@@ -471,6 +655,47 @@ def create_random_walls(width, height, num_walls=10, min_wall_height=50, min_wal
 
     return walls
 
+def initialize_realistic_map(width, height, material):
+    walls = []
+
+    # Paredes exteriores
+    walls.append(Wall((0, 0), (width, 0), material))  # Pared superior
+    walls.append(Wall((0, 0), (0, height), material))  # Pared izquierda
+    walls.append(Wall((0, height), (width, height), material))  # Pared inferior
+    walls.append(Wall((width, 0), (width, height), material))  # Pared derecha
+
+    # Habitación 1 (Sala de estar)
+    walls.append(Wall((width * 0.1, height * 0.1), (width * 0.1, height * 0.6), material))  # Pared izquierda
+    walls.append(Wall((width * 0.1, height * 0.1), (width * 0.5, height * 0.1), material))  # Pared superior
+    walls.append(Wall((width * 0.5, height * 0.1), (width * 0.5, height * 0.4), material))  # Pared derecha
+    walls.append(Wall((width * 0.3, height * 0.4), (width * 0.5, height * 0.4), material))  # Pared inferior
+
+    # Habitación 2 (Cocina)
+    walls.append(Wall((width * 0.6, height * 0.6), (width * 0.6, height * 0.9), material))  # Pared izquierda
+    walls.append(Wall((width * 0.6, height * 0.6), (width * 0.9, height * 0.6), material))  # Pared superior
+    walls.append(Wall((width * 0.9, height * 0.6), (width * 0.9, height * 0.9), material))  # Pared derecha
+
+    # Habitación 3 (Dormitorio)
+    walls.append(Wall((width * 0.1, height * 0.7), (width * 0.1, height * 0.9), material))  # Pared izquierda
+    walls.append(Wall((width * 0.1, height * 0.7), (width * 0.4, height * 0.7), material))  # Pared superior
+    walls.append(Wall((width * 0.4, height * 0.7), (width * 0.4, height * 0.9), material))  # Pared derecha
+
+    # Pasillo 1
+    walls.append(Wall((width * 0.5, height * 0.4), (width * 0.5, height * 0.6), material))  # Pared izquierda
+    walls.append(Wall((width * 0.5, height * 0.6), (width * 0.6, height * 0.6), material))  # Pared inferior
+
+    # Pasillo 2
+    walls.append(Wall((width * 0.3, height * 0.4), (width * 0.3, height * 0.7), material))  # Pared derecha
+    walls.append(Wall((width * 0.1, height * 0.6), (width * 0.3, height * 0.6), material))  # Pared superior
+
+    # Puertas
+    walls.append(Wall((width * 0.5, height * 0.4), (width * 0.5, height * 0.45), material))  # Puerta Sala de estar - Pasillo 1
+    walls.append(Wall((width * 0.6, height * 0.6), (width * 0.65, height * 0.6), material))  # Puerta Cocina - Pasillo 1
+    walls.append(Wall((width * 0.3, height * 0.6), (width * 0.3, height * 0.65), material))  # Puerta Dormitorio - Pasillo 2
+    walls.append(Wall((width * 0.1, height * 0.6), (width * 0.1, height * 0.65), material))  # Puerta Sala de estar - Pasillo 2
+
+    return walls
+
 
 # Ejemplo de uso
 if __name__ == "__main__":
@@ -482,22 +707,26 @@ if __name__ == "__main__":
     walls = initializeBorders(width, height)
     randomWalls = create_random_walls(width, height)
     walls = randomWalls + walls
+
+    walls = initialize_realistic_map(width, height, material=Material(2.8, 0.0001, 5))
+
     for wall in walls:
         environment.add_obstacle(wall)
 
     # Crear la antena transmisora
-    tx_antenna = Antenna(location=(400, 300), tx_power=10, radiation_pattern=None, frequency=2.4e9)
+    tx_antenna = Antenna(location=(500, 400), tx_power=10, radiation_pattern=None, frequency=2.4e9)
 
     # Crear la cuadrícula de receptores
     rx_grid = ReceiverGrid(dimensions=(width, height), resolution=50)
 
+    # añadir resolucion angular
     # Crear el simulador
-    simulator = Simulator(environment, tx_antenna, rx_grid, num_rays=2, max_reflections=0, max_transmissions=2)
+    simulator = Simulator(environment, tx_antenna, rx_grid, num_rays=720, min_power=1e-6, max_reflections=2, max_transmissions=1)
+    # simulator.launch_rays()
+    # simulator.generate_contour_map()
+
 
     # Crear el visualizador
     visualizer = SimulationVisualizer(simulator)
-
-    # Ejecutar la simulación
     visualizer.ray_launching(fps=30)
 
-    
