@@ -43,3 +43,8 @@ class MonitoringData(BaseModel):
         if v is not None and v < 0:
             raise ValueError('connected_hosts cannot be negative')
         return v
+    
+class MonitoringConfig(BaseModel):
+    enabled: bool = True
+    interval: int = 300
+    # Agrega otros parámetros de configuración según tus necesidades

@@ -1,8 +1,5 @@
-# config.py
-
-MONGO_URI = 'mongodb://mongo:27017/'
-MONGODB_DATABASE = 'monitoring_db'
-MONITORING_COLLECTION = 'monitoring_data'
-
-EXTERNAL_API_URL = 'http://api.example.com/monitoring-data'
-DATA_COLLECTION_INTERVAL = 60  # Intervalo de recopilación de datos en segundos
+MONGO_URI = "mongodb://mongo:27017"
+SWH_API_URL = "http://example.com/swh-api"
+SWH_API_USERNAME = "username"
+SWH_API_PASSWORD = "password"
+DATA_COLLECTION_INTERVAL = 300  # Intervalo de recopilación de datos en segundos
