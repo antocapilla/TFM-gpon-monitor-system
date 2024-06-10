@@ -754,7 +754,7 @@ if __name__ == "__main__":
 
     rx_grid = ReceiverGrid(dimensions=(width, height), resolution=120)
 
-    simulator = Simulator(environment, tx_antenna, rx_grid, num_rays=4480, max_path_loss=1e7, max_reflections=2, max_transmissions=1)
+    simulator = Simulator(environment, tx_antenna, rx_grid, num_rays=720, max_path_loss=1e7, max_reflections=2, max_transmissions=1)
     simulator.launch_rays()
     simulator.generate_contour_map()
 

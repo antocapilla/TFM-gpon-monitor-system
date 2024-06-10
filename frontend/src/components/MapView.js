@@ -11,6 +11,7 @@ import { useLeafletContext } from '@react-leaflet/core'
 import FileUpload from './FileUpload';
 import floorPlanUrl1 from '../assets/edificioA/planta2.png'
 
+
 const geoJSON = {
   "type": "FeatureCollection",
   "features": [
