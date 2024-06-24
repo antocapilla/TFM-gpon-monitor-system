@@ -15,8 +15,6 @@ function App() {
       <div className="flex">
         <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
         <div className={`flex-1 p-10 ${isSidebarOpen ? 'ml-64' : ''}`}>
-          
-          
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/manager" element={<SpaceManager />} />

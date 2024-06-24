@@ -1,59 +1,60 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import ViewStructure from '../components/ViewStructure';
 import MapViewEditor from '../components/MapView';
 import MapEditor from '../components/MapEditor';
 import FileUpload from '../components/FileUpload';
-
-const INITIAL_BUILDINGS = [
-  {
-    name: 'Edificio 1',
-    floors: [
-      { 
-        name: 'Planta 1', 
-        url: '/static/media/edificioA-planta1.c0461ddad20ac0d62f04.jpg' 
-      },
-      { name: 'Planta 2', url: '/static/media/planta2.fd861a43eb086c53dae7.png'},
-    ],
-    expanded: false,
-  },
-];
-
+import { getBuildingData, createBuilding, addFloorToBuilding, addDrawingsToFloor } from '../services/apiService';
 function SpaceManager() {
-  const [selectedLocation, setSelectedLocation] = useState("Gestion de Espacios")
-  const [buildings, setBuildings] = useState(INITIAL_BUILDINGS);
+  // const [selectedLocation, setSelectedLocation] = useState("Gestion de Espacios")
+  const [buildings, setBuildings] = useState([]);
   const [selectedFloor, setSelectedFloor] = useState(null);
+
+  useEffect(() => {
+    const fetchBuildingData = async () => {
+      const data = await getBuildingData();
+      setBuildings(data);
+    };
+
+    fetchBuildingData();
+  }, []);
 
   const handleExpandBuilding = (buildingToExpand) => {
     setBuildings(buildings.map(building => {
-      if (building.name === buildingToExpand.name) {
+      if (building.id === buildingToExpand.id) {
         return { ...building, expanded: !building.expanded };
       }
       return building;
     }));
   };
 
-  const handleAddBuilding = () => {
-    setBuildings([...buildings, { name: `Edificio ${buildings.length + 1}`, floors: [], expanded: false }]);
+  const handleAddBuilding = async (buildingData) => {
+    const newBuilding = await createBuilding(buildingData);
+    setBuildings([...buildings, newBuilding]);
   };
 
-  const handleAddFloor = (buildingToAddFloor) => {
-    const newFloor = { name: `Nueva Planta ${buildingToAddFloor.floors.length + 1}`, url: null };
-    setBuildings(buildings.map(building => {
-      if (building.name === buildingToAddFloor.name) {
-        return { ...building, floors: [...building.floors, newFloor] };
-      }
-      return building;
-    }));
+  const handleAddFloor = async (buildingId, floorData) => {
+    const newFloor = await addFloorToBuilding(buildingId, floorData);
+    setBuildings(
+      buildings.map((building) => {
+        if (building.id === buildingId) {
+          return {
+            ...building,
+            floors: [...building.floors, newFloor],
+          };
+        }
+        return building;
+      })
+    );
   };
 
   const handleDeleteBuilding = (buildingToDelete) => {
-    setBuildings(buildings.filter(building => building.name !== buildingToDelete.name));
+    setBuildings(buildings.filter(building => building.id !== buildingToDelete.id));
   };
 
   const handleDeleteFloor = (building, floorToDelete) => {
     setBuildings(buildings.map(building => {
-      if (building.name === building.name) {
-        return { ...building, floors: building.floors.filter(floor => floor.name !== floorToDelete.name) };
+      if (building.id === building.id) {
+        return { ...building, floors: building.floors.filter(floor => floor.id !== floorToDelete.id) };
       }
       return building;
     }));
@@ -65,11 +66,11 @@ function SpaceManager() {
     const newUrl = `/assets/${buildingName}-${floorName}.png`;
     // Actualiza el estado de buildings con la nueva URL
     setBuildings(buildings.map(building => {
-      if (building.name === buildingName) {
+      if (building.id === building.id) {
         return {
           ...building,
           floors: building.floors.map(floor => {
-            if (floor.name === floorName) {
+            if (floor.id === floorName) {
               return { ...floor, url: newUrl };
             }
             return floor;
@@ -80,7 +81,7 @@ function SpaceManager() {
     }));
   };
 
-  const selectedBuildingFloor = buildings.flatMap(building => building.floors).find(floor => floor.name === selectedFloor);
+  const selectedBuildingFloor = buildings.flatMap(building => building.floors).find(floor => floor.id === selectedFloor);
   const floorPlanUrl = selectedBuildingFloor?.url;
 
   const onSaveDrawings = (drawings) => {

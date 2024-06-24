@@ -20,17 +20,27 @@ async def get_monitoring_data_by_device(device_id: str):
     data = MonitoringService.get_monitoring_data_by_device(device_id)
     return data
 
-@router.get("/monitoring-data")
+@router.get("/monitoring/data")
 async def get_monitoring_data(start_date: str = None, end_date: str = None):
     data = MonitoringService.get_monitoring_data(start_date, end_date)
     return data
 
-@router.get("/monitoring-config")
+@router.get("/monitoring/config")
 async def get_monitoring_config():
     config = ConfigService.get_monitoring_config()
     return config
 
-@router.put("/monitoring-config")
+@router.put("/monitoring/config")
 async def update_monitoring_config(config: MonitoringConfig):
     ConfigService.update_monitoring_config(config)
     return {"message": "Monitoring configuration updated successfully"}
+
+@router.get("/buildings/{building_name}/floors/{floor_name}/monitoring")
+async def get_latest_monitoring_data_of_floor(building_name: str, floor_name: str):
+    data = MonitoringService.get_latest_monitoring_data_of_floor(building_name, floor_name)
+    return data
+
+@router.get("/buildings/{building_name}/monitoring")
+async def get_latest_monitoring_data_of_building(building_name: str):
+    data = MonitoringService.get_latest_monitoring_data_of_building(building_name)
+    return data

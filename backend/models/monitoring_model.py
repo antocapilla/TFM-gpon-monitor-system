@@ -2,6 +2,10 @@ from pydantic import BaseModel, Field, validator
 from typing import List, Optional
 from datetime import datetime
 
+class MonitoringConfig(BaseModel):
+    enabled: bool = True
+    interval: int = 300
+
 class HostInfo(BaseModel):
     ip_address: Optional[str] = Field(None, description="IP address of the connected host")
     address_source: Optional[str] = Field(None, description="Source of the IP address (e.g., DHCP, static)")
@@ -43,8 +47,4 @@ class MonitoringData(BaseModel):
         if v is not None and v < 0:
             raise ValueError('connected_hosts cannot be negative')
         return v
-    
-class MonitoringConfig(BaseModel):
-    enabled: bool = True
-    interval: int = 300
-    # Agrega otros parámetros de configuración según tus necesidades
+

@@ -9,11 +9,11 @@ const ViewStructure = ({ buildings, onExpandBuilding, onAddBuilding, onAddFloor,
       <div className="flow-root">
         <ul className="divide-y divide-gray-200">
           {buildings.map((building) => (
-            <li key={building.name} className="py-3 sm:py-4">
+            <li key={building.id} className="py-3 sm:py-4">
               <div className="flex items-center space-x-4">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">
-                    {building.name}
+                    {building.id}
                   </p>
                   <p className="text-sm text-gray-500 truncate">
                     {`${building.floors.length} floors`}
@@ -37,8 +37,8 @@ const ViewStructure = ({ buildings, onExpandBuilding, onAddBuilding, onAddFloor,
               {building.expanded && (
                 <div className="mt-2">
                   {building.floors.map((floor) => (
-                    <div key={floor.name} className={`flex justify-between items-center px-4 py-2 text-sm rounded-lg text-gray-700 bg-gray-50 hover:bg-gray-100 ${selectedFloor === floor.name ? 'bg-gray-200' : ''}`} onClick={() => onSelectFloor(floor.name)}>
-                      <span>{floor.name}</span>
+                    <div key={floor.id} className={`flex justify-between items-center px-4 py-2 text-sm rounded-lg text-gray-700 bg-gray-50 hover:bg-gray-100 ${selectedFloor === floor.id ? 'bg-gray-200' : ''}`} onClick={() => onSelectFloor(floor.id)}>
+                      <span>{floor.id}</span>
                       <FontAwesomeIcon
                         icon={faTimes}
                         className="text-red-500 cursor-pointer"

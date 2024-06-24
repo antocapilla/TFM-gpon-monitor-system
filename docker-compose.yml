@@ -17,7 +17,6 @@ services:
     environment:
       - NODE_ENV=development
       - CHOKIDAR_USEPOLLING=true
-    command: npm run start
   backend:
     build:
       context: ./backend
