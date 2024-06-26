@@ -1,169 +1,125 @@
 import { API_BASE_URL } from '../config';
 
-const FAKE_MONITORING_CONFIGURATION = {
-    collectionInterval: 5,
-    enable: true,
+const errorInterceptor = async (promise) => {
+  try {
+    const response = await promise;
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('API request failed:', error);
+    throw error;
+  }
+};
+
+export const getBuildingData = () => 
+  errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings`));
+
+export const createBuilding = (name) => 
+  errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  }));
+
+export const addFloorToBuilding = (buildingName, floorName) => 
+  errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}/floors`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: floorName }),
+  }));
+
+export const updateFloor = (buildingName, floorName, floorData) => 
+  errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}/floors/${encodeURIComponent(floorName)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(floorData),
+  }));
+
+
+export const uploadFile = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  return errorInterceptor(fetch(`${API_BASE_URL}/files/upload`, {
+    method: 'POST',
+    body: formData,
+  }));
+};
+
+export const updateFloorUrl = (buildingName, floorName, url) => {
+  const data = { name: floorName, url, drawings: [] };
+  console.log(`Updating floor URL: ${JSON.stringify(data)}`);
+  return errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}/floors/${encodeURIComponent(floorName)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }));
 }
 
-const FAKE_BUILDINGS = [
-    {
-      id: 'Edificio 1',
-      floors: [
-        { 
-          id: 'Planta 1', 
-          url: '/static/media/edificioA-planta1.c0461ddad20ac0d62f04.jpg',
-          drawings: [],
-          onts: [
-            { id: 'ONT-1', connectedUsers: 30, bandwidth: 100, uptime: 99.5 },
-            { id: 'ONT-2', connectedUsers: 25, bandwidth: 80, uptime: 98.7 },
-          ],
-        },
-        {
-          id: 'Planta 2',
-          url: '/static/media/planta2.fd861a43eb086c53dae7.png',
-          drawings: [],
-          onts: [
-            { id: 'ONT-3', connectedUsers: 40, bandwidth: 120, uptime: 99.8 },
-            { id: 'ONT-4', connectedUsers: 35, bandwidth: 110, uptime: 99.2 },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'Edificio 2',
-      floors: [
-        {
-          id: 'Planta 1',
-          drawings: [],
-          onts: [],
-        },
-      ],
-    },
-  ];
+export const updateFloorDrawings = (buildingName, floorName, drawings) => {
+  const data = { name: floorName, drawings };
+  console.log(`Updating floor drawings: ${JSON.stringify(data)}`);
+  return errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}/floors/${encodeURIComponent(floorName)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }));
+}
 
-  // Función para obtener los datos de los edificios
-  export const getMonitoringConfiguration = async () => {
-    // Aquí iría la llamada a la API para obtener los datos de los edificios
-    // const response = await fetch('API_BASE_URL');
-    // const data = await response.json();
-    // return data;
-  
-    // Devolver los datos de ejemplo por ahora
-    return FAKE_MONITORING_CONFIGURATION;
-  };
-  
-  // Función para obtener los datos de los edificios
-  export const getBuildingData = async () => {
-    // Aquí iría la llamada a la API para obtener los datos de los edificios
-    // const response = await fetch('API_BASE_URL');
-    // const data = await response.json();
-    // return data;
-  
-    // Devolver los datos de ejemplo por ahora
-    return FAKE_BUILDINGS;
-  };
-  
-  // Función para crear un nuevo edificio
-  export const createBuilding = async (buildingData) => {
-    // Aquí iría la llamada a la API para crear un nuevo edificio
-    // const response = await fetch('API_BASE_URL', {
-    //   method: 'POST',
-    //   body: JSON.stringify(buildingData),
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //   },
-    // });
-    // const data = await response.json();
-    // return data;
-  
-    // Simular la creación del edificio por ahora
-    const newBuilding = {
-      id: Math.floor(Math.random() * 1000),
-      name: buildingData.name,
-      floors: [],
-    };
-    FAKE_BUILDINGS.push(newBuilding);
-    return newBuilding;
-  };
-  
-  // Función para agregar una planta a un edificio
-  export const addFloorToBuilding = async (buildingId, floorData) => {
-    // Aquí iría la llamada a la API para agregar una planta al edificio
-    // const response = await fetch(`API_BASE_URL/${buildingId}/floors`, {
-    //   method: 'POST',
-    //   body: JSON.stringify(floorData),
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //   },
-    // });
-    // const data = await response.json();
-    // return data;
-  
-    // Simular la adición de la planta por ahora
-    const building = FAKE_BUILDINGS.find((building) => building.id === buildingId);
-    if (building) {
-      const newFloor = {
-        id: Math.floor(Math.random() * 1000),
-        name: floorData.name,
-        drawings: [],
-        onts: [],
-      };
-      building.floors.push(newFloor);
-      return newFloor;
-    }
-    return null;
-  };
-  
-  // Función para agregar datos de dibujo a una planta
-  export const addDrawingsToFloor = async (buildingId, floorId, drawingsData) => {
-    // Aquí iría la llamada a la API para agregar los datos de dibujo a la planta
-    // const response = await fetch(`API_BASE_URL/${buildingId}/floors/${floorId}/drawings`, {
-    //   method: 'POST',
-    //   body: JSON.stringify(drawingsData),
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //   },
-    // });
-    // const data = await response.json();
-    // return data;
-  
-    // Simular la adición de los datos de dibujo por ahora
-    const building = FAKE_BUILDINGS.find((building) => building.id === buildingId);
-    if (building) {
-      const floor = building.floors.find((floor) => floor.id === floorId);
-      if (floor) {
-        floor.drawings = drawingsData;
-        return floor.drawings;
-      }
-    }
-    return null;
-  };
-  
-  // Función para agregar una ONT a una planta
-  export const addOntToFloor = async (buildingId, floorId, ontData) => {
-    // Aquí iría la llamada a la API para agregar una ONT a la planta
-    // const response = await fetch(`API_BASE_URL/${buildingId}/floors/${floorId}/onts`, {
-    //   method: 'POST',
-    //   body: JSON.stringify(ontData),
-    //   headers: {
-    //     'Content-Type': 'application/json',
-    //   },
-    // });
-    // const data = await response.json();
-    // return data;
-  
-    // Simular la adición de la ONT por ahora
-    const building = FAKE_BUILDINGS.find((building) => building.id === buildingId);
-    if (building) {
-      const floor = building.floors.find((floor) => floor.id === floorId);
-      if (floor) {
-        const newOnt = {
-          id: Math.floor(Math.random() * 1000),
-          ...ontData,
-        };
-        floor.onts.push(newOnt);
-        return newOnt;
-      }
-    }
-    return null;
-  };
+export const updateFloorGeoJsonData = (buildingName, floorName, geoJsonData) => {
+  const data = { name: floorName, geoJsonData };
+  console.log(`Updating floor drawings: ${JSON.stringify(data)}`);
+  return errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}/floors/${encodeURIComponent(floorName)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }));
+}
+
+export const deleteBuilding = (buildingName) => 
+  errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}`, {
+    method: 'DELETE',
+  }));
+
+export const deleteFloor = (buildingName, floorName) => 
+  errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}/floors/${encodeURIComponent(floorName)}`, {
+    method: 'DELETE',
+  }));
+
+export const getMonitoringDataByDevice = (deviceId) => 
+  errorInterceptor(fetch(`${API_BASE_URL}/monitoring/data/${deviceId}`));
+
+export const getMonitoringData = (startDate, endDate) => {
+  let url = `${API_BASE_URL}/monitoring/data`;
+  if (startDate && endDate) {
+    url += `?start_date=${startDate}&end_date=${endDate}`;
+  } else if (startDate) {
+    url += `?start_date=${startDate}`;
+  } else if (endDate) {
+    url += `?end_date=${endDate}`;
+  }
+  return errorInterceptor(fetch(url));
+};
+
+export const getMonitoringConfig = () => 
+  errorInterceptor(fetch(`${API_BASE_URL}/monitoring/config`));
+
+export const updateMonitoringConfig = (config) => 
+  errorInterceptor(fetch(`${API_BASE_URL}/monitoring/config`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  }));
+
+export const getLatestMonitoringDataOfFloor = (buildingName, floorName) => 
+  errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}/floors/${encodeURIComponent(floorName)}`));
+
+export const getLatestMonitoringDataOfBuilding = (buildingName) => 
+  errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}`));
+
+export const startDataCollection = () => 
+  errorInterceptor(fetch(`${API_BASE_URL}/monitoring/start-data-collection`, {
+    method: 'POST',
+  }));

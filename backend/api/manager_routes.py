@@ -57,17 +57,17 @@ async def add_ont_to_floor(building_name: str, floor_name: str, ont: ONTModel):
     ManagerService.add_ont_to_floor(building_name, floor_name, ont)
     return {"message": "ONT added to floor successfully"}
 
-@router.get("/buildings/{building_name}/floors/{floor_name}/onts/{ont_name}")
-async def get_ont_by_name(building_name: str, floor_name: str, ont_name: str):
-    ont = ManagerService.get_ont_by_name(building_name, floor_name, ont_name)
+@router.get("/buildings/{building_name}/floors/{floor_name}/onts/{ont_serial}")
+async def get_ont_by_name(building_name: str, floor_name: str, ont_serial: str):
+    ont = ManagerService.get_ont_by_name(building_name, floor_name, ont_serial)
     return ont
 
-@router.put("/buildings/{building_name}/floors/{floor_name}/onts/{ont_name}")
-async def update_ont(building_name: str, floor_name: str, ont_name: str, ont: ONTModel):
-    ManagerService.update_ont(building_name, floor_name, ont_name, ont)
+@router.put("/buildings/{building_name}/floors/{floor_name}/onts/{ont_serial}")
+async def update_ont(building_name: str, floor_name: str, ont_serial: str, ont: ONTModel):
+    ManagerService.update_ont(building_name, floor_name, ont_serial, ont)
     return {"message": "ONT updated successfully"}
 
-@router.delete("/buildings/{building_name}/floors/{floor_name}/onts/{ont_name}")
-async def delete_ont(building_name: str, floor_name: str, ont_name: str):
-    ManagerService.delete_ont(building_name, floor_name, ont_name)
+@router.delete("/buildings/{building_name}/floors/{floor_name}/onts/{ont_serial}")
+async def delete_ont(building_name: str, floor_name: str, ont_serial: str):
+    ManagerService.delete_ont(building_name, floor_name, ont_serial)
     return {"message": "ONT deleted successfully"}

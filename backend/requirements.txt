@@ -3,3 +3,11 @@ uvicorn
 pymongo
 requests
 schedule
+python-multipart
+python-socketio
+numpy
+scipy
+matplotlib
+pygame
+pyqtree
+tqdm

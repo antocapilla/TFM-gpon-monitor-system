@@ -10,7 +10,6 @@ from scipy.constants import mu_0, epsilon_0, pi
 import copy
 import time
 import cmath
-from line_profiler import profile
 from tqdm import tqdm
 
 

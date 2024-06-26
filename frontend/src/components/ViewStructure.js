@@ -4,16 +4,24 @@ import { faChevronDown, faChevronUp, faTimes } from '@fortawesome/free-solid-svg
 import { NavLink } from 'react-router-dom';
 
 const ViewStructure = ({ buildings, onExpandBuilding, onAddBuilding, onAddFloor, onDeleteBuilding, onDeleteFloor, selectedFloor, onSelectFloor }) => {
+  if (!buildings) {
+    return (
+      <div className="bg-white shadow rounded-lg p-6">
+        <p className="text-center text-gray-500">Cargando edificios...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white shadow rounded-lg p-6">
       <div className="flow-root">
         <ul className="divide-y divide-gray-200">
           {buildings.map((building) => (
-            <li key={building.id} className="py-3 sm:py-4">
+            <li key={building.name} className="py-3 sm:py-4">
               <div className="flex items-center space-x-4">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">
-                    {building.id}
+                    {building.name}
                   </p>
                   <p className="text-sm text-gray-500 truncate">
                     {`${building.floors.length} floors`}
@@ -37,8 +45,8 @@ const ViewStructure = ({ buildings, onExpandBuilding, onAddBuilding, onAddFloor,
               {building.expanded && (
                 <div className="mt-2">
                   {building.floors.map((floor) => (
-                    <div key={floor.id} className={`flex justify-between items-center px-4 py-2 text-sm rounded-lg text-gray-700 bg-gray-50 hover:bg-gray-100 ${selectedFloor === floor.id ? 'bg-gray-200' : ''}`} onClick={() => onSelectFloor(floor.id)}>
-                      <span>{floor.id}</span>
+                    <div key={floor.name} className={`flex justify-between items-center px-4 py-2 text-sm rounded-lg text-gray-700 bg-gray-50 hover:bg-gray-100 ${selectedFloor === floor.name ? 'bg-gray-200' : ''}`} onClick={() => onSelectFloor(floor, building)}>
+                      <span>{floor.name}</span>
                       <FontAwesomeIcon
                         icon={faTimes}
                         className="text-red-500 cursor-pointer"

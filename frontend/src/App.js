@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import Sidebar from './components/Sidebar'; // Asegúrate de importar el componente Sidebar
 import Home from './pages/Home';
-import SpaceManager from './pages/SpaceManager';
-import ConfigSimulator from './pages/ConfigSimulator';
-import RealTimeMonitor from './pages/RealTimeMonitor';
+import Manager from './pages/Manager';
+import Simulator from './pages/Simulator';
+import Monitor from './pages/Monitor';
 import EditablePolygon from './components/MapEditor';
 
 function App() {
@@ -17,9 +17,9 @@ function App() {
         <div className={`flex-1 p-10 ${isSidebarOpen ? 'ml-64' : ''}`}>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/manager" element={<SpaceManager />} />
-            <Route path="/simulator" element={<EditablePolygon />} />
-            <Route path="/monitor" element={<RealTimeMonitor />} />
+            <Route path="/manager" element={<Manager />} />
+            <Route path="/simulator" element={<Simulator />} />
+            <Route path="/monitor" element={<Monitor />} />
           </Routes>
         </div>
       </div>

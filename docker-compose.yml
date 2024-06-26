@@ -23,6 +23,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./backend:/app
+      - ./backend/uploads:/app/uploads  # Asegúrate de que esta línea esté presente
     ports:
       - "8000:8000"
     environment:

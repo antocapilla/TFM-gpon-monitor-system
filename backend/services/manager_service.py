@@ -1,7 +1,6 @@
-from typing import Optional
+from typing import List, Optional, Dict, Any
 from models.manager_model import BuildingModel, FloorModel, ONTModel
 from database.database import manager_collection
-from typing import List, Optional
 
 class ManagerService:
     @staticmethod
@@ -46,9 +45,15 @@ class ManagerService:
 
     @staticmethod
     def update_floor(building_name: str, floor_name: str, floor: FloorModel):
+        print(f"Updating floor: building={building_name}, floor={floor_name}, data={floor}")
+        
+        # Crear un diccionario de actualización solo con los campos no nulos
+        update_fields = {f"floors.$.{key}": value for key, value in floor.dict().items() if value is not None}
+        
+        # Realizar la actualización solo con los campos no nulos
         manager_collection.update_one(
             {"name": building_name, "floors.name": floor_name},
-            {"$set": {"floors.$": floor.dict()}}
+            {"$set": update_fields}
         )
 
     @staticmethod
@@ -66,28 +71,36 @@ class ManagerService:
         )
 
     @staticmethod
-    def get_ont_by_name(building_name: str, floor_name: str, ont_name: str) -> Optional[ONTModel]:
+    def get_ont_by_name(building_name: str, floor_name: str, ont_serial: str) -> Optional[ONTModel]:
         building = manager_collection.find_one(
-            {"name": building_name, "floors.name": floor_name, "floors.onts.name": ont_name},
+            {"name": building_name, "floors.name": floor_name, "floors.onts.name": ont_serial},
             {"floors.$": 1}
         )
         if building and building["floors"] and building["floors"][0]["onts"]:
-            ont = next((o for o in building["floors"][0]["onts"] if o["name"] == ont_name), None)
+            ont = next((o for o in building["floors"][0]["onts"] if o["name"] == ont_serial), None)
             if ont:
                 return ONTModel(**ont)
         return None
 
     @staticmethod
-    def update_ont(building_name: str, floor_name: str, ont_name: str, ont: ONTModel):
+    def update_ont(building_name: str, floor_name: str, ont_serial: str, ont: ONTModel):
         manager_collection.update_one(
-            {"name": building_name, "floors.name": floor_name, "floors.onts.name": ont_name},
+            {"name": building_name, "floors.name": floor_name, "floors.onts.name": ont_serial},
             {"$set": {"floors.$[floor].onts.$[ont]": ont.dict()}},
-            array_filters=[{"floor.name": floor_name}, {"ont.name": ont_name}]
+            array_filters=[{"floor.name": floor_name}, {"ont.name": ont_serial}]
         )
 
     @staticmethod
-    def delete_ont(building_name: str, floor_name: str, ont_name: str):
+    def delete_ont(building_name: str, floor_name: str, ont_serial: str):
         manager_collection.update_one(
             {"name": building_name, "floors.name": floor_name},
-            {"$pull": {"floors.$.onts": {"name": ont_name}}}
+            {"$pull": {"floors.$.onts": {"serial": ont_serial}}}
+        )
+
+    # Nuevo método para actualizar el geoJsonData de un piso
+    @staticmethod
+    def update_floor_geojson(building_name: str, floor_name: str, geojson_data: Dict[str, Any]):
+        manager_collection.update_one(
+            {"name": building_name, "floors.name": floor_name},
+            {"$set": {"floors.$.geoJsonData": geojson_data}}
         )

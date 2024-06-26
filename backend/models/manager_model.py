@@ -1,16 +1,19 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
+
 
 class ONTModel(BaseModel):
-    name: str
+    serial: str
     connected_users: int
     bandwidth: int
     uptime: float
+    ip_address: Optional[str] = None
+    hosts: List[str] = []
 
 class FloorModel(BaseModel):
     name: str
     url: Optional[str] = None
-    drawings: List[str] = []
+    geoJsonData: Optional[Dict[str, Any]] = None  # Cambiado de drawings a geoJsonData
     onts: List[ONTModel] = []
 
 class BuildingModel(BaseModel):

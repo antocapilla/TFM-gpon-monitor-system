@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { format, parseISO } from 'date-fns';
 
-import { getBuildingData, getMonitoringConfiguration } from '../services/apiService';
+import { getBuildingData, getMonitoringConfig } from '../services/apiService';
 
 const metricLabels = {
   connectedUsers: 'Usuarios Conectados',
@@ -10,7 +10,7 @@ const metricLabels = {
   uptime: 'Uptime (%)',
 };
 
-function RealTimeMonitor() {
+function Monitor() {
   const [usageData, setUsageData] = useState([]);
   const [buildings, setBuildings] = useState([]);
   const [selectedBuilding, setSelectedBuilding] = useState(null);
@@ -31,7 +31,7 @@ function RealTimeMonitor() {
     };
 
     const fetchConfiguration = async () => {
-      const config = await getMonitoringConfiguration();
+      const config = await getMonitoringConfig();
       setConfiguration(config);
     };
 
@@ -538,4 +538,4 @@ function RealTimeMonitor() {
     </div>
   );
 }
-export default RealTimeMonitor;
+export default Monitor;
