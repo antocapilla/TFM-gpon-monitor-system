@@ -1,4 +1,4 @@
-FRONTEND_URL = "http://localhost:3001"
+FRONTEND_URL = "http://localhost:3000"
 MONGO_URI = "mongodb://mongo:27017"
 SWH_API_URL = "http://example.com/swh-api"
 SWH_API_USERNAME = "username"

@@ -1,5 +1,6 @@
 from typing import List, Optional, Dict, Any
-from models.manager_model import BuildingModel, FloorModel, ONTModel
+from services.swh_service import SWHService
+from models.manager_model import BuildingModel, FloorModel, ONTPosition
 from database.database import manager_collection
 
 class ManagerService:
@@ -45,12 +46,7 @@ class ManagerService:
 
     @staticmethod
     def update_floor(building_name: str, floor_name: str, floor: FloorModel):
-        print(f"Updating floor: building={building_name}, floor={floor_name}, data={floor}")
-        
-        # Crear un diccionario de actualización solo con los campos no nulos
         update_fields = {f"floors.$.{key}": value for key, value in floor.dict().items() if value is not None}
-        
-        # Realizar la actualización solo con los campos no nulos
         manager_collection.update_one(
             {"name": building_name, "floors.name": floor_name},
             {"$set": update_fields}
@@ -64,30 +60,80 @@ class ManagerService:
         )
 
     @staticmethod
-    def add_ont_to_floor(building_name: str, floor_name: str, ont: ONTModel):
+    def get_available_onts():
+        # Obtener todas las ONTs
+        all_onts = ManagerService.get_all_onts()
+        
+        # Crear un conjunto de seriales de ONTs asignadas
+        assigned_ont_serials = {ont['serial'] for ont in all_onts}
+        
+        # Obtener todas las ONTs disponibles del SWH
+        all_available_onts = SWHService.get_available_onts()
+        
+        # Filtrar las ONTs que no están asignadas
+        available_onts = [ont for ont in all_available_onts if ont not in assigned_ont_serials]
+        
+        return available_onts
+
+    @staticmethod
+    def add_ont_to_floor(building_name: str, floor_name: str, ont: ONTPosition):
         manager_collection.update_one(
             {"name": building_name, "floors.name": floor_name},
             {"$push": {"floors.$.onts": ont.dict()}}
         )
 
     @staticmethod
-    def get_ont_by_name(building_name: str, floor_name: str, ont_serial: str) -> Optional[ONTModel]:
+    def update_ont_position(building_name: str, floor_name: str, ont_serial: str, x: float, y: float):
+        manager_collection.update_one(
+            {"name": building_name, "floors.name": floor_name, "floors.onts.serial": ont_serial},
+            {"$set": {"floors.$[floor].onts.$[ont].x": x, "floors.$[floor].onts.$[ont].y": y}},
+            array_filters=[{"floor.name": floor_name}, {"ont.serial": ont_serial}]
+        )
+
+    @staticmethod
+    def get_all_onts():
+        buildings = manager_collection.find()
+        all_onts = []
+        for building in buildings:
+            for floor in building.get('floors', []):
+                all_onts.extend(floor.get('onts', []))
+        return all_onts
+
+    @staticmethod
+    def get_onts_for_building(building_name: str):
+        building = manager_collection.find_one({"name": building_name})
+        if not building:
+            return []
+        return [ont for floor in building.get('floors', []) for ont in floor.get('onts', [])]
+
+    @staticmethod
+    def get_onts_for_floor(building_name: str, floor_name: str):
         building = manager_collection.find_one(
-            {"name": building_name, "floors.name": floor_name, "floors.onts.name": ont_serial},
+            {"name": building_name, "floors.name": floor_name},
+            {"floors.$": 1}
+        )
+        if not building or not building.get('floors'):
+            return []
+        return building['floors'][0].get('onts', [])
+
+    @staticmethod
+    def get_ont_by_serial(building_name: str, floor_name: str, ont_serial: str) -> Optional[ONTPosition]:
+        building = manager_collection.find_one(
+            {"name": building_name, "floors.name": floor_name, "floors.onts.serial": ont_serial},
             {"floors.$": 1}
         )
         if building and building["floors"] and building["floors"][0]["onts"]:
-            ont = next((o for o in building["floors"][0]["onts"] if o["name"] == ont_serial), None)
+            ont = next((o for o in building["floors"][0]["onts"] if o["serial"] == ont_serial), None)
             if ont:
-                return ONTModel(**ont)
+                return ONTPosition(**ont)
         return None
 
     @staticmethod
-    def update_ont(building_name: str, floor_name: str, ont_serial: str, ont: ONTModel):
+    def update_ont_position(building_name: str, floor_name: str, ont_serial: str, x: float, y: float):
         manager_collection.update_one(
-            {"name": building_name, "floors.name": floor_name, "floors.onts.name": ont_serial},
-            {"$set": {"floors.$[floor].onts.$[ont]": ont.dict()}},
-            array_filters=[{"floor.name": floor_name}, {"ont.name": ont_serial}]
+            {"name": building_name, "floors.name": floor_name, "floors.onts.serial": ont_serial},
+            {"$set": {"floors.$[floor].onts.$[ont].x": x, "floors.$[floor].onts.$[ont].y": y}},
+            array_filters=[{"floor.name": floor_name}, {"ont.serial": ont_serial}]
         )
 
     @staticmethod
@@ -97,7 +143,6 @@ class ManagerService:
             {"$pull": {"floors.$.onts": {"serial": ont_serial}}}
         )
 
-    # Nuevo método para actualizar el geoJsonData de un piso
     @staticmethod
     def update_floor_geojson(building_name: str, floor_name: str, geojson_data: Dict[str, Any]):
         manager_collection.update_one(

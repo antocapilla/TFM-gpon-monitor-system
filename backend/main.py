@@ -6,13 +6,17 @@ from api.manager_routes import router as manager_router
 from api.monitoring_routes import router as monitoring_router
 from api.simulation_routes import router as simulation_routes
 from api.file_routes import router as file_router
+from data.fake_data_generator import router as fake_data_router
 from services.simulation_service import SimulationService
 import os
 from socketio import AsyncServer, ASGIApp
 import logging
 
+# Configurar el nivel de logging global a INFO
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
+# Desactivar los mensajes de depuración de PyMongo
+logger = logging.getLogger("pymongo").setLevel(logging.WARNING)
 
 app = FastAPI()
 
@@ -28,6 +32,7 @@ app.include_router(manager_router, prefix="/manager", tags=["manager"])
 app.include_router(monitoring_router, prefix="/monitoring", tags=["monitoring"])
 app.include_router(simulation_routes, prefix="/simulator", tags=["simulation"])
 app.include_router(file_router, prefix="/files", tags=["files"])
+app.include_router(fake_data_router, prefix="/fake_data", tags=["fake_data"])
 
 # Configurar SocketIO
 sio = AsyncServer(async_mode='asgi', cors_allowed_origins='*')

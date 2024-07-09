@@ -4,14 +4,17 @@ import MapViewEditor from '../components/MapView'; // No eliminar, lleva a error
 import MapEditor from '../components/MapEditor';
 import FileUpload from '../components/FileUpload';
 import NameModal from '../components/NameModal';
-import {   getBuildingData, 
-  createBuilding, 
-  addFloorToBuilding, 
-  deleteBuilding, 
-  deleteFloor, 
-  updateFloorGeoJsonData,
+import AddOntModal from '../components/AddOntModal';
+import {
+  getBuildingData,
+  createBuilding,
+  addFloorToBuilding,
+  deleteBuilding,
+  deleteFloor,
+  updateFloor,
   updateFloorUrl,
-  uploadFile
+  uploadFile,
+  addOntToFloor,
 } from '../services/apiService';
 
 function Manager() {
@@ -133,15 +136,61 @@ function Manager() {
     }
   };
 
-  const onSaveGeoJsonData = async (buildingName, floorName, geoJsonData) => {
+  const onSaveGeoJsonData = async (buildingName, floorName, geoJsonData, updatedOnts, scale) => {
     try {
-      await updateFloorGeoJsonData(buildingName, floorName, geoJsonData);
+      // Create the floor object as per the FloorModel
+      const floorData = {
+        name: floorName,
+        geoJsonData,
+        onts: updatedOnts,
+        scale
+      };
+  
+      // Call the updateFloor function with the buildingName, floorName, and floorData
+      await updateFloor(buildingName, floorName, floorData);
+  
+      // Update local state with the new floor data
+      setBuildings(prevBuildings => 
+        prevBuildings.map(building => 
+          building.name === buildingName
+            ? {
+                ...building,
+                floors: building.floors.map(floor => 
+                  floor.name === floorName
+                    ? { ...floor, geoJsonData, onts: updatedOnts }
+                    : floor
+                )
+              }
+            : building
+        )
+      );
+  
+      if (selectedBuilding && selectedBuilding.name === buildingName) {
+        setSelectedBuilding(prevSelectedBuilding => ({
+          ...prevSelectedBuilding,
+          floors: prevSelectedBuilding.floors.map(floor => 
+            floor.name === floorName
+              ? { ...floor, geoJsonData, onts: updatedOnts }
+              : floor
+          )
+        }));
+      }
+  
+      if (selectedFloor && selectedFloor.name === floorName) {
+        setSelectedFloor(prevSelectedFloor => ({
+          ...prevSelectedFloor,
+          geoJsonData,
+          onts: updatedOnts
+        }));
+      }
+  
       await fetchBuildingData();
     } catch (error) {
-      console.error('Error saving GeoJSON data:', error);
-      setError('Error saving GeoJSON data. Please try again.');
+      console.error('Error saving floor data:', error);
+      setError('Error saving floor data. Please try again.');
     }
   };
+  
 
   const selectedBuildingFloor = selectedBuilding?.floors.find(floor => floor.name === selectedFloor?.name);
   const floorPlanUrl = selectedBuildingFloor?.url;
@@ -155,20 +204,22 @@ function Manager() {
 
   return (
     <div className="flex-1 p-4">
-      {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-        <strong className="font-bold">Error!</strong>
-        <span className="block sm:inline"> {error}</span>
-      </div>}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Error!</strong>
+          <span className="block sm:inline"> {error}</span>
+        </div>
+      )}
       <div className="bg-white p-4 rounded-md shadow-md">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-bold">Gestion de Espacios</h2>
           <div className="flex space-x-2">
-            <button className="bg-custom-blue hover:bg-custom-dark-blue text-white font-bold py-2 px-4 rounded">
+            {/* <button className="bg-custom-blue hover:bg-custom-dark-blue text-white font-bold py-2 px-4 rounded">
               Configuracion
             </button>
             <button className="bg-custom-grey hover:bg-custom-blue text-white font-bold py-2 px-4 rounded">
               Borrar
-            </button>
+            </button> */}
           </div>
         </div>
         <div className="flex">
@@ -196,17 +247,17 @@ function Manager() {
             )}
             {!isNameModalOpen && selectedFloor ? (
               floorPlanUrl ? (
-                <MapEditor 
-                  floorPlanUrl={floorPlanUrl}
-                  initialGeoJsonData={floorGeoJsonData || { type: 'FeatureCollection', features: [] }}
-                  onSaveGeoJsonData={onSaveGeoJsonData}
-                  buildingName={selectedBuilding?.name}
-                  floorName={selectedFloor.name}
-                />
+                <>
+                  <MapEditor
+                    floorPlanUrl={floorPlanUrl}
+                    initialGeoJsonData={floorGeoJsonData || { type: 'FeatureCollection', features: [] }}
+                    onSaveGeoJsonData={onSaveGeoJsonData}
+                    buildingName={selectedBuilding?.name}
+                    floorName={selectedFloor.name}
+                  />
+                </>
               ) : (
-                <FileUpload 
-                  onFileUploaded={handleFileUpload}
-                />
+                <FileUpload onFileUploaded={handleFileUpload} />
               )
             ) : (
               <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4" role="alert">
@@ -217,7 +268,7 @@ function Manager() {
           </div>
         </div>
       </div>
-      <NameModal 
+      <NameModal
         isOpen={isNameModalOpen}
         onClose={() => {
           setIsNameModalOpen(false);

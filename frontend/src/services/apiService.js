@@ -16,6 +16,9 @@ const errorInterceptor = async (promise) => {
 export const getBuildingData = () => 
   errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings`));
 
+export const getFloorByName = (buildingName, floorName) => 
+  errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}/floors/${encodeURIComponent(floorName)}`));
+
 export const createBuilding = (name) => 
   errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings`, {
     method: 'POST',
@@ -29,6 +32,23 @@ export const addFloorToBuilding = (buildingName, floorName) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name: floorName }),
   }));
+
+  export const getAvailableONTs = () => 
+    errorInterceptor(fetch(`${API_BASE_URL}/manager/available-onts`));
+  
+  export const addOntToFloor = (buildingName, floorName, ontData) => 
+    errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}/floors/${encodeURIComponent(floorName)}/onts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ontData),
+    }));
+  
+  export const updateONTPosition = (buildingName, floorName, ontSerial, position) => 
+    errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}/floors/${encodeURIComponent(floorName)}/onts/${encodeURIComponent(ontSerial)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(position),
+    }));
 
 export const updateFloor = (buildingName, floorName, floorData) => 
   errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}/floors/${encodeURIComponent(floorName)}`, {
@@ -88,18 +108,68 @@ export const deleteFloor = (buildingName, floorName) =>
     method: 'DELETE',
   }));
 
-export const getMonitoringDataByDevice = (deviceId) => 
-  errorInterceptor(fetch(`${API_BASE_URL}/monitoring/data/${deviceId}`));
+export const deleteONTFromFloor = (buildingName, floorName, ontSerial) => 
+  errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}/floors/${encodeURIComponent(floorName)}/onts/${encodeURIComponent(ontSerial)}`, {
+    method: 'DELETE'
+  }));
 
-export const getMonitoringData = (startDate, endDate) => {
-  let url = `${API_BASE_URL}/monitoring/data`;
-  if (startDate && endDate) {
-    url += `?start_date=${startDate}&end_date=${endDate}`;
-  } else if (startDate) {
-    url += `?start_date=${startDate}`;
-  } else if (endDate) {
-    url += `?end_date=${endDate}`;
+// Actualizar o agregar las siguientes funciones para el monitoreo
+
+export const deleteMonitoringData = (level, building, floor, ont) => {
+  let url = `${API_BASE_URL}/monitoring/delete?`;
+  if (building) url += `&building=${encodeURIComponent(building)}`;
+  if (floor) url += `&floor=${encodeURIComponent(floor)}`;
+  if (ont) url += `&serial=${encodeURIComponent(ont)}`;
+  
+  return errorInterceptor(fetch(url, { method: 'DELETE' }))
+    .then(data => {
+      console.log('Deleted data:', data);
+      return data;
+    });
+};
+
+export const getTimeSeriesData = (currentLevel, selectedBuilding, selectedFloor, selectedONT, startDate, endDate) => {
+  let url = `${API_BASE_URL}/monitoring/time-series?`;
+  
+  switch(currentLevel) {
+    case 'buildings':
+      // No añadimos parámetros, obtendremos datos para todos los edificios
+      break;
+    case 'floors':
+      if (selectedBuilding) url += `&building=${encodeURIComponent(selectedBuilding)}`;
+      break;
+    case 'onts':
+      if (selectedBuilding) url += `&building=${encodeURIComponent(selectedBuilding)}`;
+      if (selectedFloor) url += `&floor=${encodeURIComponent(selectedFloor)}`;
+      break;
+    case 'ont':
+      if (selectedONT) url += `&serial=${encodeURIComponent(selectedONT)}`;
+      break;
   }
+
+  if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
+  if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`;
+  
+  console.log('Fetching time series data from URL:', url);
+  
+  return errorInterceptor(fetch(url))
+    .then(data => {
+      console.log('Time series data received:', data);
+      return data;
+    });
+};
+
+
+
+export const getLatestValues = (serial, floor, building) => {
+  console.log('Fetching latest values for:', { serial, floor, building });
+  let url = `${API_BASE_URL}/monitoring/latest-values`;
+  if (serial) url += `?serial=${encodeURIComponent(serial)}`;
+  else if (floor) url += `?floor=${encodeURIComponent(floor)}`;
+  else if (building) url += `?building=${encodeURIComponent(building)}`;
+
+  console.log('Fetching latest values from URL:', url);
+  
   return errorInterceptor(fetch(url));
 };
 
@@ -111,15 +181,4 @@ export const updateMonitoringConfig = (config) =>
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
-  }));
-
-export const getLatestMonitoringDataOfFloor = (buildingName, floorName) => 
-  errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}/floors/${encodeURIComponent(floorName)}`));
-
-export const getLatestMonitoringDataOfBuilding = (buildingName) => 
-  errorInterceptor(fetch(`${API_BASE_URL}/manager/buildings/${encodeURIComponent(buildingName)}`));
-
-export const startDataCollection = () => 
-  errorInterceptor(fetch(`${API_BASE_URL}/monitoring/start-data-collection`, {
-    method: 'POST',
   }));

@@ -1,39 +1,76 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { MapContainer, ImageOverlay, FeatureGroup, GeoJSON } from 'react-leaflet';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { MapContainer, ImageOverlay, FeatureGroup, GeoJSON, useMapEvents, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
 import L from 'leaflet';
+import { getAvailableONTs, addOntToFloor, getFloorByName, deleteONTFromFloor } from '../services/apiService';
+
+import ontIconUrl from '../assets/ont-icon.png';
 
 const DEFAULT_GEOJSON_DATA = {
   type: 'FeatureCollection',
   features: [],
 };
 
-const MapEditor = ({ floorPlanUrl, initialGeoJsonData = DEFAULT_GEOJSON_DATA, onSaveGeoJsonData, buildingName, floorName }) => {
-  console.log('MapEditor rendered. Props:', { 
-    floorPlanUrl, 
-    initialGeoJsonData: JSON.stringify(initialGeoJsonData, null, 2),
-    buildingName, 
-    floorName 
-  });
+const Modal = ({ isOpen, onClose, children }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+      <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full z-[10000]">
+        {children}
+        <button
+          className="mt-4 w-full px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+          onClick={onClose}
+        >
+          Cerrar
+        </button>
+      </div>
+    </div>
+  );
+};
 
+const MapEditor = ({ floorPlanUrl, initialGeoJsonData, onSaveGeoJsonData, buildingName, floorName }) => {
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const [zoomLevel, setZoomLevel] = useState(0);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isAddONTMode, setIsAddONTMode] = useState(false);
+  const [selectedONT, setSelectedONT] = useState(null);
+  const [availableONTs, setAvailableONTs] = useState([]);
   const [error, setError] = useState(null);
-
-  const [geoJsonData, setGeoJsonData] = useState(() => {
-    console.log('Initializing geoJsonData state with:', JSON.stringify(initialGeoJsonData, null, 2));
-    return initialGeoJsonData;
-  });
+  const [geoJsonData, setGeoJsonData] = useState(initialGeoJsonData || DEFAULT_GEOJSON_DATA);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [onts, setONTs] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const mapRef = useRef(null);
+  const [scale, setScale] = useState(1);
+  const [scaleLine, setScaleLine] = useState(null);
+  const [isAdjustingScale, setIsAdjustingScale] = useState(false);
+  const [currentZoom, setCurrentZoom] = useState(zoomLevel);
 
   useEffect(() => {
-    console.log('useEffect triggered. floorPlanUrl:', floorPlanUrl);
+    const loadFloorData = async () => {
+      setIsLoading(true);
+      try {
+        const floorData = await getFloorByName(buildingName, floorName);
+        setONTs(floorData.onts || []);
+        setGeoJsonData(floorData.geoJsonData || DEFAULT_GEOJSON_DATA);
+        setScale(floorData.scale || 1);
+      } catch (error) {
+        console.error('Error loading floor data:', error);
+        setError('Error al cargar los datos del piso.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadFloorData();
+  }, [buildingName, floorName]);
+
+  useEffect(() => {
     if (floorPlanUrl) {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.src = floorPlanUrl;
       img.onload = () => {
-        console.log('Image loaded successfully. Dimensions:', { width: img.width, height: img.height });
         setImageDimensions({ width: img.width, height: img.height });
         const zoomAdjustment = -2;
         setZoomLevel(zoomAdjustment);
@@ -43,85 +80,245 @@ const MapEditor = ({ floorPlanUrl, initialGeoJsonData = DEFAULT_GEOJSON_DATA, on
         setError(`Error al cargar el plano del piso. URL: ${floorPlanUrl}. Por favor, verifique la URL y los permisos de acceso.`);
       };
     } else {
-      console.warn('No floorPlanUrl provided');
       setError('No se ha proporcionado un plano del piso.');
     }
   }, [floorPlanUrl]);
 
+  useEffect(() => {
+    const fetchAvailableONTs = async () => {
+      try {
+        const availableONTs = await getAvailableONTs(buildingName, floorName);
+        setAvailableONTs(availableONTs);
+      } catch (error) {
+        console.error('Error fetching available ONTs:', error);
+        setError('Error al obtener las ONTs disponibles.');
+      }
+    };
+
+    fetchAvailableONTs();
+  }, [buildingName, floorName]);
+
   const handleEditClick = useCallback(() => {
-    console.log('Edit button clicked');
     setIsEditMode(true);
   }, []);
 
-  const handleSaveClick = useCallback(async () => {
-    console.log('Save button clicked. Current geoJsonData:', JSON.stringify(geoJsonData, null, 2));
-    try {
-      await onSaveGeoJsonData(buildingName, floorName, geoJsonData);
-      setIsEditMode(false);
-    } catch (error) {
-      console.error('Error saving geoJsonData:', error);
-      setError('Error al guardar los datos GeoJSON. Por favor, intente nuevamente.');
-    }
-  }, [buildingName, floorName, geoJsonData, onSaveGeoJsonData]);
-
   const handleCancelClick = useCallback(() => {
-    console.log('Cancel button clicked');
-    setGeoJsonData(initialGeoJsonData);
     setIsEditMode(false);
-  }, [initialGeoJsonData]);
+    setIsAddONTMode(false);
+    setSelectedONT(null);
+    setIsAdjustingScale(false);
+    setScaleLine(null);
+  
+    const loadFloorData = async () => {
+      try {
+        const floorData = await getFloorByName(buildingName, floorName);
+        setONTs(floorData.onts || []);
+        setGeoJsonData(floorData.geoJsonData || DEFAULT_GEOJSON_DATA);
+        setScale(floorData.scale || 1);
+      } catch (error) {
+        console.error('Error loading floor data:', error);
+        setError('Error al cargar los datos del piso.');
+      }
+    };
+  
+    loadFloorData();
+  }, [buildingName, floorName]);
 
-  const handleCreated = useCallback((e) => {
-    console.log('New feature created:', e.layer.toGeoJSON());
-    const newFeature = e.layer.toGeoJSON();
-    setGeoJsonData((prevGeoJsonData) => ({
-      ...prevGeoJsonData,
-      features: [...(prevGeoJsonData.features || []), newFeature],
-    }));
+  const handleAddONTClick = useCallback(() => {
+    setIsAddONTMode(true);
+    setIsModalOpen(true);
   }, []);
 
-  const handleEdited = useCallback((e) => {
-    console.log('Features edited:', e.layers.toGeoJSON());
-    const editedFeatures = e.layers.toGeoJSON().features;
-    setGeoJsonData((prevGeoJsonData) => ({
-      ...prevGeoJsonData,
-      features: prevGeoJsonData.features.map((feature) => {
-        const editedFeature = editedFeatures.find((f) => f.id === feature.id);
-        return editedFeature || feature;
-      }),
-    }));
+  const handleONTSelection = useCallback((ont) => {
+    setSelectedONT(ont);
+    setIsModalOpen(false);
+    if (mapRef.current) {
+      mapRef.current.getContainer().style.cursor = 'crosshair';
+    }
   }, []);
 
-  const handleDeleted = useCallback((e) => {
-    console.log('Features deleted:', e.layers.toGeoJSON());
-    const deletedLayers = e.layers;
-    setGeoJsonData((prevGeoJsonData) => ({
-      ...prevGeoJsonData,
-      features: prevGeoJsonData.features.filter((feature) => {
-        const featureLayer = L.geoJSON(feature);
-        return !deletedLayers.hasLayer(featureLayer);
-      }),
-    }));
-  }, []);
+  const addONT = useCallback(async (serial, x, y) => {
+    try {
+      await addOntToFloor(buildingName, floorName, { serial, x, y });
+      const newONT = { serial, x, y };
+      setONTs(prevONTs => [...prevONTs, newONT]);
+      setIsAddONTMode(false);
+      setSelectedONT(null);
+      if (mapRef.current) {
+        mapRef.current.getContainer().style.cursor = '';
+      }
+    } catch (error) {
+      console.error('Error adding ONT:', error);
+      setError('Error al añadir la ONT. Por favor, intente nuevamente.');
+    }
+  }, [buildingName, floorName]);
 
-  console.log('Current state before render:', { imageDimensions, zoomLevel, isEditMode, geoJsonData, error });
+  const handleAcceptClick = useCallback(async () => {
+    try {
+      await onSaveGeoJsonData(buildingName, floorName, geoJsonData, onts, scale);
+      
+      setIsEditMode(false);
+      setIsAddONTMode(false);
+      setIsAdjustingScale(false);
+      setScaleLine(null);
+    } catch (error) {
+      console.error('Error saving data:', error);
+      setError('Error al guardar los datos. Por favor, intente nuevamente.');
+    }
+  }, [buildingName, floorName, geoJsonData, onts, onSaveGeoJsonData, scale]);
 
+  const deleteONT = useCallback(async (serial) => {
+    try {
+      await deleteONTFromFloor(buildingName, floorName, serial);
+      setONTs(prevONTs => prevONTs.filter(ont => ont.serial !== serial));
+    } catch (error) {
+      console.error('Error deleting ONT:', error);
+      setError('Error al eliminar la ONT. Por favor, intente nuevamente.');
+    }
+  }, [buildingName, floorName]);
+
+  const MapEvents = () => {
+    const map = useMapEvents({
+      click: (e) => {
+        if (isAddONTMode && selectedONT) {
+          addONT(selectedONT, e.latlng.lng, e.latlng.lat);
+        } else if (isAdjustingScale) {
+          if (scaleLine.length === 0) {
+            setScaleLine([e.latlng]);
+          } else {
+            const newScaleLine = [...scaleLine, e.latlng];
+            setScaleLine(newScaleLine);
+
+            if (newScaleLine.length === 2) {
+              const distance = map.distance(newScaleLine[0], newScaleLine[1]);
+              const userScale = prompt('Ingrese la distancia real en metros:');
+              if (userScale) {
+                setScale(parseFloat(userScale) / distance);
+                setIsAdjustingScale(false);
+                setScaleLine(null);
+                if (mapRef.current) {
+                  mapRef.current.getContainer().style.cursor = '';
+                }
+              }
+            }
+          }
+        }
+      },
+      zoomend: () => {
+        setCurrentZoom(map.getZoom());
+      },
+    });
+
+    return null;
+  };
+
+  const ONTMarkers = () => {
+    const ontIcon = new L.Icon({
+      iconUrl: ontIconUrl,
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize: [41, 41]
+    });
+
+    return onts.map(ont => (
+      <Marker
+        key={ont.serial}
+        position={[ont.y, ont.x]}
+        icon={ontIcon}
+      >
+        <Popup>
+          <div>
+            <p><strong>ONT Serial:</strong> {ont.serial}</p>
+            <p><strong>Position:</strong> ({ont.x.toFixed(2)}, {ont.y.toFixed(2)})</p>
+            {isEditMode && (
+              <button
+                className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 focus:outline-none mt-2"
+                onClick={() => deleteONT(ont.serial)}
+              >
+                Eliminar ONT
+              </button>
+            )}
+          </div>
+        </Popup>
+      </Marker>
+    ));
+  };
+
+  const ScaleLegend = () => {
+    const map = useMap();
+    if (scale === 1) return null;
+  
+    const scaleWidth = 100; // Ancho fijo de 100 pixels
+    const mapScale = map.options.crs.scale(currentZoom);
+    const realDistance = (scaleWidth / mapScale) * scale;
+  
+    return (
+      <div className="absolute bottom-8 left-8 bg-white p-2 rounded shadow z-[1000]">
+        <div style={{ width: `${scaleWidth}px`, height: '5px', backgroundColor: 'black' }} />
+        <p className="text-sm mt-1">{realDistance.toFixed(2)} metros</p>
+      </div>
+    );
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <strong className="font-bold">Error: </strong>
+        <span className="block sm:inline">{error}</span>
+      </div>
+    );
+  }
+
+  if (imageDimensions.width === 0 || imageDimensions.height === 0) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative bg-custom-grey-2 p-4 rounded-md shadow-lg" style={{ width: '100%', height: '500px' }}>
-      {error ? (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-          <strong className="font-bold">Error: </strong>
-          <span className="block sm:inline">{error}</span>
-        </div>
-      ) : imageDimensions.width === 0 || imageDimensions.height === 0 ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-gray-900"></div>
-        </div>
-      ) : (
+    <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+      <div className="space-x-2 mb-4">
+        {!isEditMode ? (
+          <button
+            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 focus:outline-none"
+            onClick={handleEditClick}
+          >
+            Editar
+          </button>
+        ) : (
+          <>
+            <button
+              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 focus:outline-none"
+              onClick={handleAcceptClick}
+            >
+              Aceptar
+            </button>
+            <button
+              className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 focus:outline-none"
+              onClick={handleCancelClick}
+            >
+              Cancelar
+            </button>
+          </>
+        )}
+      </div>
+      
+      <div className="relative" style={{ height: 'calc(100vh - 200px)' }}>
         <MapContainer
+          ref={mapRef}
           center={[imageDimensions.height / 2, imageDimensions.width / 2]}
           zoom={zoomLevel}
-          minZoom={-5}
           style={{ height: '100%', width: '100%' }}
           crs={L.CRS.Simple}
         >
@@ -130,14 +327,35 @@ const MapEditor = ({ floorPlanUrl, initialGeoJsonData = DEFAULT_GEOJSON_DATA, on
             <GeoJSON data={geoJsonData} />
             {isEditMode && (
               <EditControl
-                position="bottomright"
-                onCreated={handleCreated}
-                onEdited={handleEdited}
-                onDeleted={handleDeleted}
+                position="topright"
+                onCreated={(e) => {
+                  const newFeature = e.layer.toGeoJSON();
+                  setGeoJsonData(prevData => ({
+                    ...prevData,
+                    features: [...prevData.features, newFeature]
+                  }));
+                }}
+                onEdited={(e) => {
+                  const editedLayers = e.layers.toGeoJSON();
+                  setGeoJsonData(prevData => ({
+                    ...prevData,
+                    features: prevData.features.map(f => {
+                      const editedFeature = editedLayers.features.find(ef => ef.id === f.id);
+                      return editedFeature || f;
+                    })
+                  }));
+                }}
+                onDeleted={(e) => {
+                  const deletedLayers = e.layers.toGeoJSON();
+                  setGeoJsonData(prevData => ({
+                    ...prevData,
+                    features: prevData.features.filter(f => !deletedLayers.features.some(df => df.id === f.id))
+                  }));
+                }}
                 draw={{
                   polygon: true,
                   polyline: true,
-                  rectangle: false,
+                  rectangle: true,
                   circle: false,
                   marker: false,
                   circlemarker: false,
@@ -145,33 +363,64 @@ const MapEditor = ({ floorPlanUrl, initialGeoJsonData = DEFAULT_GEOJSON_DATA, on
               />
             )}
           </FeatureGroup>
+          <ONTMarkers />
+          <MapEvents />
+  
+          {isAdjustingScale && scaleLine && scaleLine.length === 1 && (
+            <Marker 
+              position={scaleLine[0]}
+              icon={L.divIcon({className: 'bg-blue-500 w-3 h-3 rounded-full border-2 border-white'})}
+            />
+          )}
+          {isAdjustingScale && scaleLine && scaleLine.length === 2 && (
+            <Polyline positions={scaleLine} color="red" weight={3} />
+          )}
+          <ScaleLegend />
         </MapContainer>
-      )}
-      <div className="absolute top-4 right-4 space-x-2">
-        {!isEditMode ? (
-          <button
-            className="px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none"
-            onClick={handleEditClick}
-          >
-            Editar
-          </button>
-        ) : (
-          <>
+
+        {isEditMode && (
+          <div className="absolute bottom-4 right-4 z-[1000] space-y-2">
             <button
-              className="px-4 py-2 text-white bg-green-500 rounded-md hover:bg-green-600 focus:outline-none"
-              onClick={handleSaveClick}
+              className="px-4 py-2 bg-purple-500 text-white rounded-md hover:bg-purple-600 focus:outline-none"
+              onClick={handleAddONTClick}
             >
-              Aceptar cambios
+              Añadir ONT
             </button>
             <button
-              className="px-4 py-2 text-white bg-red-500 rounded-md hover:bg-red-600 focus:outline-none"
-              onClick={handleCancelClick}
+              className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 focus:outline-none"
+              onClick={() => {
+                setIsAdjustingScale(true);
+                setScaleLine([]);
+                if (mapRef.current) {
+                  mapRef.current.getContainer().style.cursor = 'crosshair';
+                }
+              }}
             >
-              Cancelar
+              Ajustar Escala
             </button>
-          </>
+          </div>
         )}
       </div>
+
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+        <h2 className="text-xl font-bold mb-4">Seleccionar ONT</h2>
+        <select 
+          value={selectedONT || ''}
+          onChange={(e) => handleONTSelection(e.target.value)}
+          className="w-full p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Seleccionar ONT</option>
+          {availableONTs.map(ont => (
+            <option key={ont} value={ont}>{ont}</option>
+          ))}
+        </select>
+      </Modal>
+
+      {/* {scale !== 1 && (
+        <div className="mt-4 p-2 bg-blue-100 rounded">
+          <p>Escala actual: 1 metro = {scale.toFixed(2)} unidades en el mapa</p>
+        </div>
+      )} */}
     </div>
   );
 };

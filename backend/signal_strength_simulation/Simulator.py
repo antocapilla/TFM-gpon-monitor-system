@@ -751,9 +751,9 @@ if __name__ == "__main__":
 
     tx_antenna = Antenna(location=(4.2, 2), tx_power=0.03, radiation_pattern=None, frequency=2.4e9)
 
-    rx_grid = ReceiverGrid(dimensions=(width, height), resolution=120)
+    rx_grid = ReceiverGrid(dimensions=(width, height), resolution=30)
 
-    simulator = Simulator(environment, tx_antenna, rx_grid, num_rays=720, max_path_loss=1e7, max_reflections=2, max_transmissions=1)
+    simulator = Simulator(environment, tx_antenna, rx_grid, num_rays=1440, max_path_loss=1e6, max_reflections=2, max_transmissions=1)
     simulator.launch_rays()
     simulator.generate_contour_map()
 

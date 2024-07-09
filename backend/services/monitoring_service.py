@@ -1,93 +1,243 @@
-import requests
-from database.database import monitoring_data_collection, monitoring_config_collection, buildings_collection, floors_collection, onts_collection
+import logging
+from typing import List, Dict, Optional, Any
+from datetime import datetime, timedelta
+from database.database import monitoring_data_collection, monitoring_config_collection
+from models.monitoring_model import ONTData, MonitoringConfig
 from services.manager_service import ManagerService
-from models.monitoring_model import MonitoringData, MonitoringConfig
-from config import SWH_API_URL, SWH_API_USERNAME, SWH_API_PASSWORD
+from bson import ObjectId
+
+logger = logging.getLogger(__name__)
 
 class MonitoringService:
     @staticmethod
-    def create_monitoring_data(data: MonitoringData):
-        monitoring_data_collection.insert_one(data.dict())
+    def create_monitoring_data(data: List[ONTData]):
+        ont_data_list = [ont_data.dict() for ont_data in data]
+        monitoring_data_collection.insert_many(ont_data_list)
 
     @staticmethod
-    def get_monitoring_data_by_device(device_id: str):
-        data = list(monitoring_data_collection.find({"device_id": device_id}))
-        for item in data:
-            item["_id"] = str(item["_id"])
-        return data
+    def delete_monitoring_data(building: Optional[str] = None, 
+                            floor: Optional[str] = None, 
+                            serial: Optional[str] = None) -> Dict[str, Any]:
+        logger.info(f"delete_monitoring_data called with building={building}, floor={floor}, serial={serial}")
+        
+        onts_to_query = []
+        
+        if serial:
+            onts_to_query = [{"serial": serial}]
+            logger.info(f"Deleting data for single ONT with serial: {serial}")
+        elif floor and building:
+            onts_to_query = ManagerService.get_onts_for_floor(building, floor)
+            logger.info(f"Deleting data for {len(onts_to_query)} ONTs in building '{building}', floor '{floor}'")
+        elif building:
+            onts_to_query = ManagerService.get_onts_for_building(building)
+            logger.info(f"Deleting data for {len(onts_to_query)} ONTs in building '{building}'")
+        else:
+            # Si no se proporciona ningún parámetro, obtener todas las ONTs
+            onts_to_query = ManagerService.get_all_onts()
+            logger.info(f"Deleting data for all {len(onts_to_query)} ONTs")
+        
+        if not onts_to_query:
+            logger.warning("No ONTs found to delete data")
+            return {
+                "deleted_count": 0,
+                "onts_affected": []
+            }
+
+        serials = [ont['serial'] for ont in onts_to_query]
+        logger.info(f"ONT serials to delete data: {serials}")
+        
+        result = monitoring_data_collection.delete_many({'serial': {'$in': serials}})
+        deleted_count = result.deleted_count
+        
+        logger.info(f"Deleted {deleted_count} documents for {len(serials)} ONTs")
+        return {
+            "deleted_count": deleted_count,
+            "onts_affected": serials
+        }
 
     @staticmethod
-    def get_monitoring_data(start_date: str = None, end_date: str = None):
-        query = {}
-        if start_date and end_date:
-            query["timestamp"] = {"$gte": start_date, "$lte": end_date}
-        elif start_date:
-            query["timestamp"] = {"$gte": start_date}
-        elif end_date:
-            query["timestamp"] = {"$lte": end_date}
+    def get_time_series_data(
+        serial: Optional[str] = None,
+        floor: Optional[str] = None,
+        building: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        interval: str = 'hour'
+    ) -> List[Dict]:
+        match = {}
+        if serial:
+            match['serial'] = serial
+        elif floor and building:
+            onts = ManagerService.get_onts_for_floor(building, floor)
+            match['serial'] = {'$in': [ont['serial'] for ont in onts]}
+        elif building:
+            onts = ManagerService.get_onts_for_building(building)
+            match['serial'] = {'$in': [ont['serial'] for ont in onts]}
+        
+        if start_date:
+            match['timestamp'] = {'$gte': start_date}
+        if end_date:
+            match['timestamp'] = match.get('timestamp', {})
+            match['timestamp']['$lte'] = end_date
 
-        data = list(monitoring_data_collection.find(query))
-        for item in data:
-            item["_id"] = str(item["_id"])
-        return data
+        group_id = {
+            'year': {'$year': '$timestamp'},
+            'month': {'$month': '$timestamp'},
+            'day': {'$dayOfMonth': '$timestamp'},
+        }
+        if interval == 'hour':
+            group_id['hour'] = {'$hour': '$timestamp'}
+        elif interval == 'minute':
+            group_id['hour'] = {'$hour': '$timestamp'}
+            group_id['minute'] = {'$minute': '$timestamp'}
+
+        pipeline = [
+            {'$match': match},
+            {'$group': {
+                '_id': group_id,
+                'totalBytesReceived': {'$sum': {'$sum': '$wans.bytesReceived'}},
+                'totalBytesSent': {'$sum': {'$sum': '$wans.bytesSent'}},
+                'totalWifiAssociations': {'$sum': {'$sum': '$wifi.totalAssociations'}},
+                'activeWANs': {'$avg': {'$size': {'$filter': {
+                    'input': '$wans',
+                    'as': 'wan',
+                    'cond': {'$eq': ['$$wan.connectionStatus', 'Connected']}
+                }}}},
+                'activeWiFiInterfaces': {'$avg': {'$size': {'$filter': {
+                    'input': '$wifi',
+                    'as': 'wifi',
+                    'cond': {'$and': [
+                        {'$eq': ['$$wifi.status', 'Up']},
+                        {'$eq': ['$$wifi.enable', True]}
+                    ]}
+                }}}},
+                'connectedHosts': {'$sum': {'$size': '$hosts'}},
+            }},
+            {'$sort': {'_id': 1}}
+        ]
+
+        results = list(monitoring_data_collection.aggregate(pipeline))
+        
+        formatted_results = []
+        for result in results:
+            timestamp = datetime(
+                year=result['_id']['year'],
+                month=result['_id']['month'],
+                day=result['_id']['day'],
+                hour=result['_id'].get('hour', 0),
+                minute=result['_id'].get('minute', 0)
+            )
+            formatted_results.append({
+                'timestamp': timestamp,
+                'totalBytesReceived': result['totalBytesReceived'],
+                'totalBytesSent': result['totalBytesSent'],
+                'totalWifiAssociations': result['totalWifiAssociations'],
+                'activeWANs': result['activeWANs'],
+                'activeWiFiInterfaces': result['activeWiFiInterfaces'],
+                'connectedHosts': result['connectedHosts'],
+            })
+
+        return formatted_results
     
     @staticmethod
-    def get_latest_monitoring_data_of_floor(floor_id: str):
-        floor = ManagerService.get_floor_by_id(floor_id)
-        if not floor:
-            return None
+    def get_latest_values(serial: Optional[str] = None, 
+                        floor: Optional[str] = None, 
+                        building: Optional[str] = None) -> Dict:
+        logger.info(f"get_latest_values called with serial={serial}, floor={floor}, building={building}")
+        
+        onts_to_query = []
+        
+        if serial:
+            onts_to_query = [{"serial": serial}]
+            logger.info(f"Querying for single ONT with serial: {serial}")
+        elif floor and building:
+            onts_to_query = ManagerService.get_onts_for_floor(building, floor)
+            logger.info(f"Retrieved {len(onts_to_query)} ONTs for building '{building}', floor '{floor}'")
+        elif building:
+            onts_to_query = ManagerService.get_onts_for_building(building)
+            logger.info(f"Retrieved {len(onts_to_query)} ONTs for building '{building}'")
+        else:
+            # Si no se proporciona ningún parámetro, obtener todas las ONTs
+            onts_to_query = ManagerService.get_all_onts()
+            logger.info(f"Retrieved {len(onts_to_query)} ONTs in total")
+        
+        if not onts_to_query:
+            logger.warning("No ONTs found to query")
+            return {
+                "timestamp": None,
+                "totalBytesReceived": 0,
+                "totalBytesSent": 0,
+                "totalWifiAssociations": 0,
+                "activeWANs": 0,
+                "activeWiFiInterfaces": 0,
+                "connectedHosts": 0,
+                "deviceCount": 0
+            }
 
-        ont_ids = [ont.id for ont in floor.onts]
-        query = {"device_id": {"$in": ont_ids}}
+        serials = [ont['serial'] for ont in onts_to_query]
+        logger.info(f"ONT serials to query: {serials}")
+        
+        pipeline = [
+            {'$match': {'serial': {'$in': serials}}},
+            {'$sort': {'timestamp': -1}},
+            {'$group': {
+                '_id': '$serial',
+                'timestamp': {'$first': '$timestamp'},
+                'totalBytesReceived': {'$first': {'$sum': '$wans.bytesReceived'}},
+                'totalBytesSent': {'$first': {'$sum': '$wans.bytesSent'}},
+                'totalWifiAssociations': {'$first': {'$sum': '$wifi.totalAssociations'}},
+                'activeWANs': {'$first': {'$size': {'$filter': {
+                    'input': '$wans',
+                    'as': 'wan',
+                    'cond': {'$eq': ['$$wan.connectionStatus', 'Connected']}
+                }}}},
+                'activeWiFiInterfaces': {'$first': {'$size': {'$filter': {
+                    'input': '$wifi',
+                    'as': 'wifi',
+                    'cond': {'$and': [
+                        {'$eq': ['$$wifi.status', 'Up']},
+                        {'$eq': ['$$wifi.enable', True]}
+                    ]}
+                }}}},
+                'connectedHosts': {'$first': {'$size': '$hosts'}},
+                'softwareVersion': {'$first': '$deviceInfo.softwareVersion'},
+            }},
+            {'$group': {
+                '_id': None,
+                'timestamp': {'$max': '$timestamp'},
+                'totalBytesReceived': {'$sum': '$totalBytesReceived'},
+                'totalBytesSent': {'$sum': '$totalBytesSent'},
+                'totalWifiAssociations': {'$sum': '$totalWifiAssociations'},
+                'activeWANs': {'$sum': '$activeWANs'},
+                'activeWiFiInterfaces': {'$sum': '$activeWiFiInterfaces'},
+                'connectedHosts': {'$sum': '$connectedHosts'},
+                'deviceCount': {'$sum': 1},
+            }}
+        ]
 
-        data = list(monitoring_data_collection.find(query).sort("timestamp", -1).limit(1))
-        for item in data:
-            item["_id"] = str(item["_id"])
-        return data
+        logger.info(f"Executing MongoDB aggregation pipeline: {pipeline}")
+        result = list(monitoring_data_collection.aggregate(pipeline))
+        logger.info(f"Aggregation result: {result}")
 
-    @staticmethod
-    def get_latest_monitoring_data_of_building(building_id: str):
-        building = ManagerService.get_building_by_id(building_id)
-        if not building:
-            return None
+        if not result:
+            logger.warning("No results found from aggregation")
+            return {
+                "timestamp": None,
+                "totalBytesReceived": 0,
+                "totalBytesSent": 0,
+                "totalWifiAssociations": 0,
+                "activeWANs": 0,
+                "activeWiFiInterfaces": 0,
+                "connectedHosts": 0,
+                "deviceCount": 0
+            }
 
-        ont_ids = []
-        for floor in building.floors:
-            ont_ids.extend(ont.id for ont in floor.onts)
-
-        query = {"device_id": {"$in": ont_ids}}
-
-        data = list(monitoring_data_collection.find(query).sort("timestamp", -1).limit(1))
-        for item in data:
-            item["_id"] = str(item["_id"])
-        return data
-    
-    @staticmethod
-    def collect_and_store_ont_data():
-        config = MonitoringService.get_monitoring_config()
-        if not config.enabled:
-            print("Data collection is disabled. Skipping.")
-            return
-
-        try:
-            response = requests.get(SWH_API_URL, auth=(SWH_API_USERNAME, SWH_API_PASSWORD))
-            response.raise_for_status()
-            onts_data = response.json()
-
-            for ont_data in onts_data:
-                monitoring_model = MonitoringData(
-                    device_id=ont_data["device_id"],
-                    timestamp=ont_data["timestamp"],
-                    # ... mapear otros campos de los datos al modelo MonitoringData
-                )
-                monitoring_data_collection.insert_one(monitoring_model.dict())
-
-            print("ONT data collected and stored successfully")
-        except requests.exceptions.RequestException as e:
-            print(f"Error collecting ONT data from SWH API: {e}")
-        except Exception as e:
-            print(f"Error storing ONT data: {e}")
-
+        latest_values = result[0]
+        latest_values['_id'] = building or floor or serial or "all"
+        logger.info(f"Returning latest values: {latest_values}")
+        return latest_values
+     
+    # Monitoring Configurations
     @staticmethod
     def get_monitoring_config():
         config_data = monitoring_config_collection.find_one()
