@@ -127,42 +127,17 @@ const Simulator = () => {
             />
           </div>
         );
-      case SIMULATION_TYPES.WIFI_CHANNEL_ALLOCATION:
-        return (
-          <div className="mt-4">
-            <h3 className="text-xl font-semibold mb-4">Asignación de canales WiFi</h3>
-            <table className="min-w-full bg-white border-collapse border border-gray-300">
-              <thead>
-                <tr>
-                  <th className="border border-gray-300 px-4 py-2">ONT ID</th>
-                  <th className="border border-gray-300 px-4 py-2">Posición X</th>
-                  <th className="border border-gray-300 px-4 py-2">Posición Y</th>
-                  <th className="border border-gray-300 px-4 py-2">Canal WiFi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {simulationResult.map((result, index) => (
-                  <tr key={index}>
-                    <td className="border border-gray-300 px-4 py-2">{result.serial}</td>
-                    <td className="border border-gray-300 px-4 py-2">{result.x.toFixed(2)}</td>
-                    <td className="border border-gray-300 px-4 py-2">{result.y.toFixed(2)}</td>
-                    <td className="border border-gray-300 px-4 py-2">{result.channel}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        );
       default:
         return null;
     }
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-6 text-center">Simulador de Configuración</h1>
-      
-      <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+    <div className="container mx-auto p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <h1 className="text-3xl font-bold mb-6 col-span-3 text-center">Simulador de Configuración</h1>
+  
+      {/* Sidebar for controls */}
+      <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 order-2 md:order-1 md:col-span-1"> 
         <div className="mb-4">
           <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="building">
             Edificio
@@ -179,7 +154,7 @@ const Simulator = () => {
             ))}
           </select>
         </div>
-
+  
         <div className="mb-4">
           <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="floor">
             Planta
@@ -197,8 +172,8 @@ const Simulator = () => {
             ))}
           </select>
         </div>
-
-        <div className="mb-6">
+  
+        <div className="mb-4"> 
           <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="simulation">
             Tipo de Simulación
           </label>
@@ -215,7 +190,7 @@ const Simulator = () => {
             ))}
           </select>
         </div>
-
+  
         <div className="flex items-center justify-center">
           <button
             onClick={runSimulation}
@@ -228,17 +203,30 @@ const Simulator = () => {
           </button>
         </div>
       </div>
-
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-          <strong className="font-bold">Error: </strong>
-          <span className="block sm:inline">{error}</span>
+  
+      {/* Main area for simulation results */}
+      <div className="col-span-3 md:col-span-2 order-1 md:order-2">
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+            <strong className="font-bold">Error: </strong>
+            <span className="block sm:inline">{error}</span>
+          </div>
+        )}
+  
+        <div className="border rounded-md p-4 flex flex-col h-full"> 
+          {!simulationResult && (
+            <div className="flex-grow flex items-center justify-center text-gray-500">
+              Seleccione un edificio y una planta para comenzar la simulación
+            </div>
+          )}
+          {simulationResult && renderSimulationResult()}
         </div>
-      )}
-
-      {simulationResult && renderSimulationResult()}
+      </div>
     </div>
   );
+  
+  
+
 };
 
 export default Simulator;

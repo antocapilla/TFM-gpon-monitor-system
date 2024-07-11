@@ -44,9 +44,9 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
       .thresholds(30)
       (heatmapPoints);
 
-    // Heatmap color scale (verde es mejor, rojo es peor)
-    const heatmapColorScale = d3.scaleSequential(d3.interpolateRdYlGn)
-      .domain([0, d3.max(contours, d => d.value)]);
+     // Heatmap color scale (verde es mejor, rojo es peor)
+     const heatmapColorScale = d3.scaleSequential(d3.interpolateRdYlGn)
+      .domain([d3.min(contours, d => d.value), d3.max(contours, d => d.value)]);
 
     g.append("g")
       .attr("fill", "none")
@@ -115,7 +115,7 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
           .attr("points", points)
           .attr("fill", "none")
           .attr("stroke", "black")
-          .attr("stroke-width", 2);
+          .attr("stroke-width", 4);
       } else if (feature.geometry.type === "LineString") {
         const points = feature.geometry.coordinates.map(coord =>
           `${xScale(coord[0])},${yScale(coord[1])}`
@@ -125,39 +125,40 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
           .attr("points", points)
           .attr("fill", "none")
           .attr("stroke", "black")
-          .attr("stroke-width", 2);
+          .attr("stroke-width", 4);
       }
     });
 
     // Pintar los dispositivos (onts) y sus nombres
     g.selectAll(".device")
       .data(onts)
-      .enter()
-      .append("g")
+      .join("g")
       .attr("class", "device")
-      .each(function (d) {
+      .each(function(d) {
         d3.select(this)
           .append("circle")
           .attr("cx", xScale(d.x))
           .attr("cy", yScale(d.y))
-          .attr("r", 5)
+          .attr("r", 8)  // Slightly larger circles
           .attr("fill", "blue")
           .attr("stroke", "white")
-          .attr("stroke-width", 1.5);
+          .attr("stroke-width", 2);  // Thicker stroke
 
         d3.select(this)
           .append("text")
           .attr("x", xScale(d.x))
-          .attr("y", yScale(d.y) - 10)
+          .attr("y", yScale(d.y) - 12) // Positioned above the circle
           .attr("text-anchor", "middle")
-          .attr("font-size", "10px")
-          .attr("fill", "black")
-          .text(d.name);
+          .attr("font-size", "12px")   // Slightly larger font size
+          .attr("fill", "black") // White text for better contrast on blue
+          .text(d.serial);  // Display the serial number
       });
 
+    // Leyenda (ajustes menores)
     legend.selectAll(".tick text")
       .attr("x", 4)
-      .attr("dy", -2);
+      .attr("dy", -2)
+      .attr("font-size", "10px"); // Smaller font size for ticks
   }, [heatmapData, geoJsonData, onts, width, height, buildingImageUrl]);
 
   const getBounds = (geoJsonData) => {
