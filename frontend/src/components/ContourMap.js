@@ -10,7 +10,7 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    const margin = { top: 20, right: 100, bottom: 20, left: 20 };
+    const margin = { top: 40, right: 100, bottom: 20, left: 20 };
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
@@ -44,8 +44,8 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
       .thresholds(30)
       (heatmapPoints);
 
-    // Heatmap color scale (usando colores más interesantes)
-    const heatmapColorScale = d3.scaleSequential(d3.interpolateTurbo)
+    // Heatmap color scale (verde es mejor, rojo es peor)
+    const heatmapColorScale = d3.scaleSequential(d3.interpolateRdYlGn)
       .domain([0, d3.max(contours, d => d.value)]);
 
     g.append("g")
@@ -62,7 +62,7 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
     const legendWidth = 20;
     const legendHeight = innerHeight / 2;
     const dBmDomain = [-100, -40];
-    const legendColorScale = d3.scaleSequential(d3.interpolateTurbo).domain(dBmDomain);
+    const legendColorScale = d3.scaleSequential(d3.interpolateRdYlGn).domain(dBmDomain);
     const legendScale = d3.scaleLinear().domain(dBmDomain).range([legendHeight, 0]);
 
     const legend = svg.append("g")

@@ -116,8 +116,8 @@ const Simulator = () => {
     switch (selectedSimulation) {
       case SIMULATION_TYPES.SIGNAL_PROPAGATION:
         return (
-          <div className="mt-4">
-            <h3 className="text-lg font-semibold mb-2">Mapa de propagación de señal</h3>
+          <div className="mt-4 text-center">
+            <h3 className="text-xl font-semibold mb-4">Mapa de propagación de señal</h3>
             <ContourMap 
               width={800} 
               height={600} 
@@ -130,7 +130,7 @@ const Simulator = () => {
       case SIMULATION_TYPES.WIFI_CHANNEL_ALLOCATION:
         return (
           <div className="mt-4">
-            <h3 className="text-lg font-semibold mb-2">Asignación de canales WiFi</h3>
+            <h3 className="text-xl font-semibold mb-4">Asignación de canales WiFi</h3>
             <table className="min-w-full bg-white border-collapse border border-gray-300">
               <thead>
                 <tr>
@@ -160,7 +160,7 @@ const Simulator = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-6">Simulador de Configuración</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center">Simulador de Configuración</h1>
       
       <div className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
         <div className="mb-4">
@@ -216,7 +216,7 @@ const Simulator = () => {
           </select>
         </div>
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-center">
           <button
             onClick={runSimulation}
             disabled={!selectedSimulation || isLoading}
