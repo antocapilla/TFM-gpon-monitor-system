@@ -127,6 +127,48 @@ const Simulator = () => {
             />
           </div>
         );
+      case SIMULATION_TYPES.WIFI_CHANNEL_ALLOCATION:
+        return (
+          <div className="mt-4">
+            <h3 className="text-xl font-semibold mb-4">Asignación de canales WiFi</h3>
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    ONT ID
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Estado
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Canal WiFi
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Clientes Conectados
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Intensidad de Señal (dBm)
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {simulationResult.map((result, index) => (
+                  <tr key={index}>
+                    <td className="px-6 py-4 whitespace-nowrap">{result.serial}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${result.status === 'Online' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {result.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">{result.channel}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{result.connectedClients}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{result.signalStrength}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
       default:
         return null;
     }
