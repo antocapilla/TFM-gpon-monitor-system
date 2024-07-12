@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any
 from services.swh_service import SWHService
 from models.manager_model import BuildingModel, FloorModel, ONTPosition
-from database.database import manager_collection
+from database.mongo import manager_collection
 
 class ManagerService:
     @staticmethod

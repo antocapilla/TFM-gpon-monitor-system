@@ -28,7 +28,6 @@ function Monitor() {
   const [selectedONT, setSelectedONT] = useState(null);
   const [currentLevel, setCurrentLevel] = useState('buildings');
   const [selectedTab, setSelectedTab] = useState('realtime');
-  const [selectedMetrics, setSelectedMetrics] = useState(Object.keys(metricLabels));
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,6 +35,9 @@ function Monitor() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedHistoricalMetric, setSelectedHistoricalMetric] = useState(Object.keys(metricLabels)[0]);
+  const [selectedMetrics, setSelectedMetrics] = useState(Object.keys(metricLabels));
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -192,35 +194,49 @@ function Monitor() {
   return (
     <div className="container mx-auto">
       <h1 className="text-2xl font-bold mb-4">Monitorización</h1>
-      
-      <Breadcrumb 
+
+      <Breadcrumb
         currentLevel={currentLevel}
         selectedBuilding={selectedBuilding}
         selectedFloor={selectedFloor}
         selectedONT={selectedONT}
         handleBreadcrumbClick={handleBreadcrumbClick}
       />
-      <Summary 
+
+      <Summary
         latestValues={latestValues}
         selectedMetrics={selectedMetrics}
         metricLabels={metricLabels}
       />
-      <TabSelector 
-        selectedTab={selectedTab}
-        setSelectedTab={setSelectedTab}
-      />
-      
+
+      <TabSelector selectedTab={selectedTab} setSelectedTab={setSelectedTab} />
+
       {selectedTab === 'realtime' && (
-        <RealtimeData 
+        <RealtimeData
           tableData={tableData}
           selectedMetrics={selectedMetrics}
           metricLabels={metricLabels}
+          setSelectedMetrics={setSelectedMetrics}
           handleItemClick={handleItemClick}
+
+          // Configuración y Borrado en RealtimeData
+          configuration={configuration}
+          setConfiguration={setConfiguration}
+          handleConfigSave={handleConfigSave}
+          isModalOpen={isModalOpen}
+          setIsModalOpen={setIsModalOpen}
+          isDeleteModalOpen={isDeleteModalOpen}
+          setIsDeleteModalOpen={setIsDeleteModalOpen}
+          currentLevel={currentLevel}
+          selectedBuilding={selectedBuilding}
+          selectedFloor={selectedFloor}
+          selectedONT={selectedONT}
+          handleDelete={handleDelete}
         />
       )}
-      
+
       {selectedTab === 'historical' && (
-        <HistoricalData 
+        <HistoricalData
           isLoading={isLoading}
           error={error}
           timeSeriesData={timeSeriesData}
@@ -228,56 +244,17 @@ function Monitor() {
           setStartDate={setStartDate}
           endDate={endDate}
           setEndDate={setEndDate}
-          selectedMetrics={selectedMetrics}
+          selectedMetric={selectedHistoricalMetric}
           metricLabels={metricLabels}
           formatTimestamp={formatTimestamp}
+
+          setSelectedHistoricalMetric={setSelectedHistoricalMetric}
         />
       )}
-      
-      <button
-        className="fixed bottom-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-md shadow-md"
-        onClick={() => setIsModalOpen(true)}
-      >
-        Configuración
-      </button>
-
-      <div className="fixed bottom-4 right-4 flex space-x-2">
-        <button
-          className="bg-red-500 text-white px-4 py-2 rounded-md shadow-md"
-          onClick={() => setIsDeleteModalOpen(true)}
-        >
-          Borrar Datos
-        </button>
-        <button
-          className="bg-blue-500 text-white px-4 py-2 rounded-md shadow-md"
-          onClick={() => setIsModalOpen(true)}
-        >
-          Configuración
-        </button>
-      </div>
-      
-      <ConfigurationModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        configuration={configuration}
-        setConfiguration={setConfiguration}
-        selectedMetrics={selectedMetrics}
-        setSelectedMetrics={setSelectedMetrics}
-        metricLabels={metricLabels}
-        handleConfigSave={handleConfigSave}
-      />
-
-      <DeleteConfirmationModal 
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={handleDelete}
-        level={currentLevel}
-        building={selectedBuilding}
-        floor={selectedFloor}
-        ont={selectedONT}
-      />
     </div>
   );
+
+
 }
 
 export default Monitor;

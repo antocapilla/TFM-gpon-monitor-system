@@ -1,10 +1,11 @@
 import logging
 from typing import List, Dict, Optional, Any
 from datetime import datetime, timedelta
-from database.database import monitoring_data_collection, monitoring_config_collection
+from database.mongo import monitoring_data_collection, monitoring_config_collection
 from models.monitoring_model import ONTData, MonitoringConfig
 from services.manager_service import ManagerService
 from bson import ObjectId
+
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +112,11 @@ class MonitoringService:
                         {'$eq': ['$$wifi.enable', True]}
                     ]}
                 }}}},
-                'connectedHosts': {'$sum': {'$size': '$hosts'}},
+                'connectedHosts': {'$avg': {'$size': {'$filter': {
+                    'input': '$hosts',
+                    'as': 'host',
+                    'cond': {'$eq': ['$$host.isConnected', True]} 
+                }}}}
             }},
             {'$sort': {'_id': 1}}
         ]
@@ -134,7 +139,6 @@ class MonitoringService:
                 'totalWifiAssociations': result['totalWifiAssociations'],
                 'activeWANs': result['activeWANs'],
                 'activeWiFiInterfaces': result['activeWiFiInterfaces'],
-                'connectedHosts': result['connectedHosts'],
             })
 
         return formatted_results
@@ -170,7 +174,6 @@ class MonitoringService:
                 "totalWifiAssociations": 0,
                 "activeWANs": 0,
                 "activeWiFiInterfaces": 0,
-                "connectedHosts": 0,
                 "deviceCount": 0
             }
 
@@ -199,7 +202,11 @@ class MonitoringService:
                         {'$eq': ['$$wifi.enable', True]}
                     ]}
                 }}}},
-                'connectedHosts': {'$first': {'$size': '$hosts'}},
+                'connectedHosts': {'$first': {'$size': {'$filter': {
+                    'input': '$hosts',
+                    'as': 'host',
+                    'cond': {'$eq': ['$$host.isConnected', True]}
+                }}}},
                 'softwareVersion': {'$first': '$deviceInfo.softwareVersion'},
             }},
             {'$group': {
@@ -228,7 +235,6 @@ class MonitoringService:
                 "totalWifiAssociations": 0,
                 "activeWANs": 0,
                 "activeWiFiInterfaces": 0,
-                "connectedHosts": 0,
                 "deviceCount": 0
             }
 
@@ -237,6 +243,8 @@ class MonitoringService:
         logger.info(f"Returning latest values: {latest_values}")
         return latest_values
      
+
+
     # Monitoring Configurations
     @staticmethod
     def get_monitoring_config():

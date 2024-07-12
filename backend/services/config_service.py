@@ -1,4 +1,4 @@
-from database.database import monitoring_config_collection
+from database.mongo import monitoring_config_collection
 from models.monitoring_model import MonitoringConfig
 
 class ConfigService:
