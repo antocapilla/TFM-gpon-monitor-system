@@ -1,11 +1,16 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
-const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingImageUrl }) => {
+const ContourMap = ({ heatmapData, geoJsonData, onts, width, height }) => {
   const svgRef = useRef(null);
 
   useEffect(() => {
     if (!heatmapData || !geoJsonData || !onts) return;
+
+    console.log("Heatmap Data:", heatmapData);
+    console.log("GeoJson Data:", geoJsonData);
+    console.log("ONTs:", onts);
+    console.log("SVG Ref:", svgRef.current);
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
@@ -17,14 +22,6 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
     const g = svg.append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // Add background image
-    svg.append("image")
-      .attr("xlink:href", buildingImageUrl)
-      .attr("x", margin.left)
-      .attr("y", margin.top)
-      .attr("width", innerWidth)
-      .attr("height", innerHeight);
-
     // Calcular los límites del GeoJSON
     const bounds = getBounds(geoJsonData);
     const [[x0, y0], [x1, y1]] = bounds;
@@ -34,36 +31,42 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
     const yScale = d3.scaleLinear().domain([y1, y0]).range([0, innerHeight]);
 
     // Crear el mapa de calor
-    const heatmapPoints = heatmapData.map(d => [xScale(d.lng), yScale(d.lat), d.value]);
-    const contours = d3.contourDensity()
-      .x(d => d[0])
-      .y(d => d[1])
-      .weight(d => d[2])
-      .size([innerWidth, innerHeight])
-      .bandwidth(40) // Ajustar el ancho de banda para una mejor distribución
-      .thresholds(30)
-      (heatmapPoints);
+    const minValue = d3.min(heatmapData, d => d.value);
+    const maxValue = d3.max(heatmapData, d => d.value);
 
-     // Heatmap color scale (verde es mejor, rojo es peor)
-     const heatmapColorScale = d3.scaleSequential(d3.interpolateRdYlGn)
-      .domain([d3.min(contours, d => d.value), d3.max(contours, d => d.value)]);
+    const colorScale = d3.scaleSequential(d3.interpolateRdYlGn)
+      .domain([minValue, maxValue]); 
+
+    // Dentro del hook useEffect, después de configurar las escalas
+    const samplingFactor = 0; // Ajusta este valor según sea necesario
+    const sampledData = heatmapData.filter((_, i) => i % samplingFactor === 0);
+
+
+    const densityData = d3.contourDensity()
+      .x(d => xScale(d.lng))
+      .y(d => yScale(d.lat))
+      .weight(d => d.value)
+      .size([innerWidth, innerHeight])
+      .bandwidth(20) // Ajusta el ancho de banda para contornos más suaves
+      .thresholds([minValue, (minValue + maxValue) / 2, maxValue]) // Umbrales explícitos
+      (heatmapData); // Usar sampledData si se aplica muestreo
 
     g.append("g")
       .attr("fill", "none")
       .attr("stroke", "none")
       .selectAll("path")
-      .data(contours)
+      .data(densityData)
       .join("path")
-      .attr("fill", d => heatmapColorScale(d.value))
-      .attr("d", d3.geoPath())
+      .attr("fill", d => colorScale(d.value))
+      .attr("d", d3.geoPath(d3.geoIdentity().reflectY(true)))
       .attr("opacity", 0.7);
 
     // Añadir leyenda
     const legendWidth = 20;
     const legendHeight = innerHeight / 2;
-    const dBmDomain = [-100, -40];
-    const legendColorScale = d3.scaleSequential(d3.interpolateRdYlGn).domain(dBmDomain);
-    const legendScale = d3.scaleLinear().domain(dBmDomain).range([legendHeight, 0]);
+    const legendScale = d3.scaleLinear()
+      .domain(colorScale.domain())
+      .range([legendHeight, 0]);
 
     const legend = svg.append("g")
       .attr("transform", `translate(${width - margin.right + 40},${margin.top + innerHeight / 4})`);
@@ -77,10 +80,10 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
       .attr("y2", "0%");
 
     legendGradient.selectAll("stop")
-      .data(d3.range(dBmDomain[0], dBmDomain[1], (dBmDomain[1] - dBmDomain[0]) / 10))
+      .data(colorScale.ticks().map((t, i, n) => ({ offset: `${100*i/n.length}%`, color: colorScale(t) })))
       .enter().append("stop")
-      .attr("offset", (d, i) => `${(i / 9) * 100}%`)
-      .attr("stop-color", d => legendColorScale(d));
+      .attr("offset", d => d.offset)
+      .attr("stop-color", d => d.color);
 
     legend.append("rect")
       .attr("width", legendWidth)
@@ -98,7 +101,7 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
     const legendAxis = d3.axisRight(legendScale)
       .tickSize(legendWidth)
       .ticks(5)
-      .tickFormat(d3.format("d"));
+      .tickFormat(d3.format(".2f"));
 
     legend.append("g")
       .call(legendAxis)
@@ -115,7 +118,7 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
           .attr("points", points)
           .attr("fill", "none")
           .attr("stroke", "black")
-          .attr("stroke-width", 4);
+          .attr("stroke-width", 2);
       } else if (feature.geometry.type === "LineString") {
         const points = feature.geometry.coordinates.map(coord =>
           `${xScale(coord[0])},${yScale(coord[1])}`
@@ -125,9 +128,18 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
           .attr("points", points)
           .attr("fill", "none")
           .attr("stroke", "black")
-          .attr("stroke-width", 4);
+          .attr("stroke-width", 2);
       }
     });
+
+    g.selectAll(".heatmap-point")
+    .data(heatmapData)
+    .join("circle")
+    .attr("class", "heatmap-point")
+    .attr("cx", d => xScale(d.lng))
+    .attr("cy", d => yScale(d.lat))
+    .attr("r", 2)
+    .attr("fill", d => colorScale(d.value));
 
     // Pintar los dispositivos (onts) y sus nombres
     g.selectAll(".device")
@@ -139,27 +151,22 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
           .append("circle")
           .attr("cx", xScale(d.x))
           .attr("cy", yScale(d.y))
-          .attr("r", 8)  // Slightly larger circles
+          .attr("r", 6)
           .attr("fill", "blue")
           .attr("stroke", "white")
-          .attr("stroke-width", 2);  // Thicker stroke
+          .attr("stroke-width", 2);
 
         d3.select(this)
           .append("text")
           .attr("x", xScale(d.x))
-          .attr("y", yScale(d.y) - 12) // Positioned above the circle
+          .attr("y", yScale(d.y) - 10)
           .attr("text-anchor", "middle")
-          .attr("font-size", "12px")   // Slightly larger font size
-          .attr("fill", "black") // White text for better contrast on blue
-          .text(d.serial);  // Display the serial number
+          .attr("font-size", "10px")
+          .attr("fill", "black")
+          .text(d.serial);
       });
 
-    // Leyenda (ajustes menores)
-    legend.selectAll(".tick text")
-      .attr("x", 4)
-      .attr("dy", -2)
-      .attr("font-size", "10px"); // Smaller font size for ticks
-  }, [heatmapData, geoJsonData, onts, width, height, buildingImageUrl]);
+  }, [heatmapData, geoJsonData, onts, width, height]);
 
   const getBounds = (geoJsonData) => {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -175,6 +182,11 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
       });
     });
     return [[minX, minY], [maxX, maxY]];
+  };
+
+  const sampleData = (data, sampleSize) => {
+    const step = Math.max(1, Math.floor(data.length / sampleSize));
+    return data.filter((_, i) => i % step === 0);
   };
 
   return (

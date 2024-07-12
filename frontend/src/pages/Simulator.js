@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import ContourMap from '../components/ContourMap';
-import { getBuildingData } from '../services/apiService';
+import { getBuildingData, runSimulation } from '../services/apiService';
 
 const SIMULATION_TYPES = {
   SIGNAL_PROPAGATION: 'Propagación de señal',
@@ -18,8 +18,12 @@ const Simulator = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const data = await getBuildingData();
-      setBuildings(data);
+      try {
+        const data = await getBuildingData();
+        setBuildings(data);
+      } catch (err) {
+        setError('Error al cargar los datos de los edificios.');
+      }
     };
     fetchData();
   }, []);
@@ -39,6 +43,22 @@ const Simulator = () => {
   const handleSimulationChange = (e) => {
     setSelectedSimulation(e.target.value);
     setSimulationResult(null);
+  };
+
+  const handleRunSimulation = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await runSimulation(selectedBuilding, selectedFloor, selectedSimulation);
+      setSimulationResult(result);
+      // console.log("Simulation result:", result); // For debugging
+    } catch (err) {
+      setError('Error al ejecutar la simulación. Por favor, intente nuevamente.');
+      console.error("Simulation error:", err); // For debugging
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const generateFakeHeatmapData = (geoJsonData, onts) => {
@@ -80,38 +100,10 @@ const Simulator = () => {
     return [[minX, minY], [maxX, maxY]];
   };
 
-  const runSimulation = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const selectedBuildingData = buildings.find(b => b.name === selectedBuilding);
-      const selectedFloorData = selectedBuildingData.floors.find(f => f.name === selectedFloor);
-
-      if (selectedSimulation === SIMULATION_TYPES.SIGNAL_PROPAGATION) {
-        const heatmapData = generateFakeHeatmapData(selectedFloorData.geoJsonData, selectedFloorData.onts);
-
-        setSimulationResult({
-          heatmapData,
-          geoJsonData: selectedFloorData.geoJsonData,
-          onts: selectedFloorData.onts
-        });
-      } else if (selectedSimulation === SIMULATION_TYPES.WIFI_CHANNEL_ALLOCATION) {
-        const channelAllocation = selectedFloorData.onts.map(ont => ({
-          ...ont,
-          channel: Math.floor(Math.random() * 11) + 1
-        }));
-        setSimulationResult(channelAllocation);
-      }
-    } catch (err) {
-      setError('Error al ejecutar la simulación. Por favor, intente nuevamente.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const renderSimulationResult = () => {
-    if (!simulationResult) return null;
+    if (!simulationResult || !simulationResult.result) return null;
+
+    console.log("Simulation Result:", simulationResult);
 
     switch (selectedSimulation) {
       case SIMULATION_TYPES.SIGNAL_PROPAGATION:
@@ -121,9 +113,9 @@ const Simulator = () => {
             <ContourMap 
               width={800} 
               height={600} 
-              heatmapData={simulationResult.heatmapData}
-              geoJsonData={simulationResult.geoJsonData}
-              onts={simulationResult.onts}
+              heatmapData={simulationResult.result.heatmapData}
+              geoJsonData={simulationResult.result.geoJsonData}
+              onts={simulationResult.result.onts}
             />
           </div>
         );
@@ -235,7 +227,7 @@ const Simulator = () => {
   
         <div className="flex items-center justify-center">
           <button
-            onClick={runSimulation}
+            onClick={handleRunSimulation}
             disabled={!selectedSimulation || isLoading}
             className={`bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline ${
               (!selectedSimulation || isLoading) ? 'opacity-50 cursor-not-allowed' : ''
@@ -266,9 +258,6 @@ const Simulator = () => {
       </div>
     </div>
   );
-  
-  
-
 };
 
 export default Simulator;

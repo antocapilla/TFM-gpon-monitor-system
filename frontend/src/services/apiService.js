@@ -182,3 +182,28 @@ export const updateMonitoringConfig = (config) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config),
   }));
+
+// En apiService.js
+
+export const runSimulation = async (buildingName, floorName, simulationType) => {
+  const response = await fetch(`${API_BASE_URL}/simulator/run-simulation`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      building_name: buildingName,
+      floor_name: floorName,
+      simulation_type: simulationType,
+    }),
+  });
+
+  if (!response.ok) {
+    console.error("Network response was not ok", response);
+    throw new Error('Network response was not ok');
+  }
+
+  const result = await response.json();
+  console.log("Simulation API Result:", result);
+  return result;
+};
