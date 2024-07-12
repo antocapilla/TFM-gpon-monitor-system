@@ -5,6 +5,20 @@ services:
     restart: always
     ports:
       - "27017:27017"
+  influxdb:
+    image: influxdb:2.0
+    restart: always
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=myuser
+      - DOCKER_INFLUXDB_INIT_PASSWORD=mypassword
+      - DOCKER_INFLUXDB_INIT_ORG=myorg
+      - DOCKER_INFLUXDB_INIT_BUCKET=network_monitoring
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=mytoken
   frontend:
     build:
       context: ./frontend
@@ -23,9 +37,12 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./backend:/app
-      - ./backend/uploads:/app/uploads  # Asegúrate de que esta línea esté presente
+      - ./backend/uploads:/app/uploads
     ports:
       - "8000:8000"
     environment:
       - PYTHONUNBUFFERED=1
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  influxdb-data:

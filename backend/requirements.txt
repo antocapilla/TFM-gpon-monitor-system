@@ -11,3 +11,4 @@ matplotlib
 pygame
 pyqtree
 tqdm
+influxdb-client==1.24.0
