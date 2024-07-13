@@ -7,11 +7,6 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height }) => {
   useEffect(() => {
     if (!heatmapData || !geoJsonData || !onts) return;
 
-    console.log("Heatmap Data:", heatmapData);
-    console.log("GeoJson Data:", geoJsonData);
-    console.log("ONTs:", onts);
-    console.log("SVG Ref:", svgRef.current);
-
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
@@ -35,30 +30,22 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height }) => {
     const maxValue = d3.max(heatmapData, d => d.value);
 
     const colorScale = d3.scaleSequential(d3.interpolateRdYlGn)
-      .domain([minValue, maxValue]); 
+      .domain([minValue, maxValue]);
 
-    // Dentro del hook useEffect, después de configurar las escalas
-    const samplingFactor = 0; // Ajusta este valor según sea necesario
-    const sampledData = heatmapData.filter((_, i) => i % samplingFactor === 0);
+    // Crear un mapa de calor usando rect elements
+    const cellWidth = innerWidth / Math.sqrt(heatmapData.length);
+    const cellHeight = innerHeight / Math.sqrt(heatmapData.length);
 
-
-    const densityData = d3.contourDensity()
-      .x(d => xScale(d.lng))
-      .y(d => yScale(d.lat))
-      .weight(d => d.value)
-      .size([innerWidth, innerHeight])
-      .bandwidth(20) // Ajusta el ancho de banda para contornos más suaves
-      .thresholds([minValue, (minValue + maxValue) / 2, maxValue]) // Umbrales explícitos
-      (heatmapData); // Usar sampledData si se aplica muestreo
-
-    g.append("g")
-      .attr("fill", "none")
-      .attr("stroke", "none")
-      .selectAll("path")
-      .data(densityData)
-      .join("path")
+    g.selectAll(".heat-cell")
+      .data(heatmapData)
+      .enter()
+      .append("rect")
+      .attr("class", "heat-cell")
+      .attr("x", d => xScale(d.lng))
+      .attr("y", d => yScale(d.lat))
+      .attr("width", cellWidth)
+      .attr("height", cellHeight)
       .attr("fill", d => colorScale(d.value))
-      .attr("d", d3.geoPath(d3.geoIdentity().reflectY(true)))
       .attr("opacity", 0.7);
 
     // Añadir leyenda
@@ -132,15 +119,6 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height }) => {
       }
     });
 
-    g.selectAll(".heatmap-point")
-    .data(heatmapData)
-    .join("circle")
-    .attr("class", "heatmap-point")
-    .attr("cx", d => xScale(d.lng))
-    .attr("cy", d => yScale(d.lat))
-    .attr("r", 2)
-    .attr("fill", d => colorScale(d.value));
-
     // Pintar los dispositivos (onts) y sus nombres
     g.selectAll(".device")
       .data(onts)
@@ -182,11 +160,6 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height }) => {
       });
     });
     return [[minX, minY], [maxX, maxY]];
-  };
-
-  const sampleData = (data, sampleSize) => {
-    const step = Math.max(1, Math.floor(data.length / sampleSize));
-    return data.filter((_, i) => i % step === 0);
   };
 
   return (
