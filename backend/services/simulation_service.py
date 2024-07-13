@@ -101,8 +101,11 @@ class SimulationService:
 
     def calculate_signal_strength(self, origin, point, scale):
         distance = np.linalg.norm(point - origin) * scale
-        signal_strength = max(-100, -20 * math.log10(distance) - 40)  # en dBm
-        return signal_strength
+        # Calculamos la potencia en dBm primero
+        power_dbm = max(-100, -20 * math.log10(distance) - 40)
+        # Convertimos dBm a watts
+        power_watts = 10 ** ((power_dbm - 30) / 10)
+        return power_watts
 
     def run_simulation(self, geojson_data, onts: List[ONTPosition], scale):
         self.walls_points = self.process_geojson(geojson_data)
@@ -111,7 +114,7 @@ class SimulationService:
         min_x, min_y = np.min(all_coords, axis=0)
         max_x, max_y = np.max(all_coords, axis=0)
 
-        resolution = 5  # Ajustar según necesidad
+        resolution = 10  # Ajustar según necesidad
         x_values = np.arange(min_x, max_x, resolution)
         y_values = np.arange(min_y, max_y, resolution)
         grid_x, grid_y = np.meshgrid(x_values, y_values)

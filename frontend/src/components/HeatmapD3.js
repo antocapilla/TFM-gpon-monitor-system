@@ -1,177 +1,201 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
-import { hexbin } from 'd3-hexbin';
 
-const HeatmapD3 = ({ heatmapData, geoJsonData, width, height }) => {
-  const svgRef = useRef();
-  const [hexRadius, setHexRadius] = useState(10);
+const ContourMap = ({ heatmapData, geoJsonData, onts, width, height }) => {
+  const svgRef = useRef(null);
 
   useEffect(() => {
-    const svg = d3.select(svgRef.current);
-    svg.selectAll('*').remove();
+    if (!heatmapData || !geoJsonData || !onts) return;
 
-    const margin = { top: 20, right: 30, bottom: 30, left: 40 };
+    console.log("Heatmap Data:", heatmapData);
+    console.log("GeoJson Data:", geoJsonData);
+    console.log("ONTs:", onts);
+    console.log("SVG Ref:", svgRef.current);
+
+    const svg = d3.select(svgRef.current);
+    svg.selectAll("*").remove();
+
+    const margin = { top: 40, right: 100, bottom: 20, left: 20 };
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
-    const g = svg.append('g')
-      .attr('transform', `translate(${margin.left},${margin.top})`);
+    const g = svg.append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // Mejorar la escala de colores
-    const colorScale = d3.scaleSequential(d3.interpolateYlOrRd)
-      .domain([0, d3.max(heatmapData, d => d.value)]);
+    // Calcular los límites del GeoJSON
+    const bounds = getBounds(geoJsonData);
+    const [[x0, y0], [x1, y1]] = bounds;
 
-    // Mejorar la proyección
-    const projection = d3.geoMercator()
-      .fitSize([innerWidth, innerHeight], geoJsonData);
-    const pathGenerator = d3.geoPath().projection(projection);
+    // Crear escalas
+    const xScale = d3.scaleLinear().domain([x0, x1]).range([0, innerWidth]);
+    const yScale = d3.scaleLinear().domain([y1, y0]).range([0, innerHeight]);
 
-    // Dibujar el fondo del mapa
-    g.append('rect')
-      .attr('width', innerWidth)
-      .attr('height', innerHeight)
-      .attr('fill', '#f0f0f0');
+    // Crear el mapa de calor
+    const minValue = d3.min(heatmapData, d => d.value);
+    const maxValue = d3.max(heatmapData, d => d.value);
 
-    // Dibujar los elementos del GeoJSON con estilo mejorado
-    g.append('g')
-      .selectAll('path')
-      .data(geoJsonData.features)
-      .enter()
-      .append('path')
-      .attr('d', pathGenerator)
-      .attr('fill', 'none')
-      .attr('stroke', '#000')
-      .attr('stroke-width', 1);
+    const colorScale = d3.scaleSequential(d3.interpolateRdYlGn)
+      .domain([minValue, maxValue]); 
 
-    // Crear un elemento para el mapa de calor
-    const heatmapElement = g.append('g');
+    // Dentro del hook useEffect, después de configurar las escalas
+    const samplingFactor = 1; // Ajusta este valor según sea necesario
+    const sampledData = heatmapData.filter((_, i) => i % samplingFactor === 0);
 
-    // Función para actualizar el mapa de calor
-    const updateHeatmap = () => {
-      const hexbinGenerator = hexbin()
-        .extent([[0, 0], [innerWidth, innerHeight]])
-        .radius(hexRadius);
+    const densityData = d3.contourDensity()
+      .x(d => xScale(d.lng))
+      .y(d => yScale(d.lat))
+      .weight(d => d.value)
+      .size([innerWidth, innerHeight])
+      .bandwidth(20) // Ajusta el ancho de banda para contornos más suaves
+      .thresholds([minValue, (minValue + maxValue) / 2, maxValue]) // Umbrales explícitos
+      (sampledData); // Usar sampledData si se aplica muestreo
 
-      const projectedData = heatmapData.map(d => {
-        const [x, y] = projection([d.lng, d.lat]);
-        return [x, y, d.value];
-      });
+    g.append("g")
+      .attr("fill", "none")
+      .attr("stroke", "none")
+      .selectAll("path")
+      .data(densityData)
+      .join("path")
+      .attr("fill", d => colorScale(d.value))
+      .attr("d", d3.geoPath(d3.geoIdentity().reflectY(true)))
+      .attr("opacity", 0.7);
 
-      const bins = hexbinGenerator(projectedData);
-
-      heatmapElement.selectAll('path')
-        .data(bins)
-        .join('path')
-        .attr('d', hexbinGenerator.hexagon())
-        .attr('transform', d => `translate(${d.x},${d.y})`)
-        .attr('fill', d => colorScale(d3.mean(d, k => k[2])))
-        .attr('stroke', '#fff')
-        .attr('stroke-width', 0.1)
-        .attr('opacity', 0.8);
-    };
-
-    updateHeatmap();
-
-    // Crear la leyenda de colores mejorada
+    // Añadir leyenda
     const legendWidth = 20;
     const legendHeight = innerHeight / 2;
-
     const legendScale = d3.scaleLinear()
       .domain(colorScale.domain())
       .range([legendHeight, 0]);
 
-    const legendAxis = d3.axisRight(legendScale)
-      .ticks(5)
-      .tickSize(6)
-      .tickFormat(d3.format('.2f'));
+    const legend = svg.append("g")
+      .attr("transform", `translate(${width - margin.right + 40},${margin.top + innerHeight / 4})`);
 
-    const legend = g.append('g')
-      .attr('transform', `translate(${innerWidth + 10}, ${innerHeight - legendHeight})`);
+    const legendGradient = legend.append("defs")
+      .append("linearGradient")
+      .attr("id", "legend-gradient")
+      .attr("x1", "0%")
+      .attr("y1", "100%")
+      .attr("x2", "0%")
+      .attr("y2", "0%");
 
-    legend.append('text')
-      .attr('x', 0)
-      .attr('y', -10)
-      .attr('font-weight', 'bold')
-      .text('Intensidad');
-
-    const defs = svg.append('defs');
-
-    const linearGradient = defs.append('linearGradient')
-      .attr('id', 'linear-gradient')
-      .attr('x1', '0%')
-      .attr('y1', '100%')
-      .attr('x2', '0%')
-      .attr('y2', '0%');
-
-    linearGradient.selectAll('stop')
+    legendGradient.selectAll("stop")
       .data(colorScale.ticks().map((t, i, n) => ({ offset: `${100 * i / n.length}%`, color: colorScale(t) })))
-      .enter()
-      .append('stop')
-      .attr('offset', d => d.offset)
-      .attr('stop-color', d => d.color);
+      .enter().append("stop")
+      .attr("offset", d => d.offset)
+      .attr("stop-color", d => d.color);
 
-    legend.append('rect')
-      .attr('width', legendWidth)
-      .attr('height', legendHeight)
-      .style('fill', 'url(#linear-gradient)');
+    legend.append("rect")
+      .attr("width", legendWidth)
+      .attr("height", legendHeight)
+      .style("fill", "url(#legend-gradient)");
 
-    legend.append('g')
-      .attr('transform', `translate(${legendWidth}, 0)`)
-      .call(legendAxis);
+    legend.append("text")
+      .attr("x", legendWidth / 2)
+      .attr("y", -10)
+      .attr("text-anchor", "middle")
+      .attr("font-size", "12px")
+      .attr("font-weight", "bold")
+      .text("Nivel de señal (dBm)");
 
-    // Agregar interactividad
-    const tooltip = d3.select('body').append('div')
-      .attr('class', 'tooltip')
-      .style('opacity', 0)
-      .style('position', 'absolute')
-      .style('background-color', 'white')
-      .style('border', 'solid')
-      .style('border-width', '1px')
-      .style('border-radius', '5px')
-      .style('padding', '10px');
+    const legendAxis = d3.axisRight(legendScale)
+      .tickSize(legendWidth)
+      .ticks(5)
+      .tickFormat(d3.format(".2f"));
 
-    heatmapElement.selectAll('path')
-      .on('mouseover', (event, d) => {
-        tooltip.transition()
-          .duration(200)
-          .style('opacity', .9);
-        tooltip.html(`Intensidad promedio: ${d3.format('.2f')(d3.mean(d, k => k[2]))}`)
-          .style('left', (event.pageX + 10) + 'px')
-          .style('top', (event.pageY - 28) + 'px');
-      })
-      .on('mouseout', () => {
-        tooltip.transition()
-          .duration(500)
-          .style('opacity', 0);
+    legend.append("g")
+      .call(legendAxis)
+      .select(".domain").remove();
+
+    
+
+    // Dibujar puntos del mapa de calor con círculos más grandes
+    g.selectAll(".heatmap-point")
+      .data(heatmapData)
+      .join("circle")
+      .attr("class", "heatmap-point")
+      .attr("cx", d => xScale(d.lng))
+      .attr("cy", d => yScale(d.lat))
+      .attr("r", 5) // Ajusta el tamaño del radio aquí para hacer los círculos más grandes
+      .attr("fill", d => colorScale(d.value));
+
+    // Dibujar el contorno del edificio
+    geoJsonData.features.forEach(feature => {
+      if (feature.geometry.type === "Polygon") {
+        const points = feature.geometry.coordinates[0].map(coord =>
+          `${xScale(coord[0])},${yScale(coord[1])}`
+        ).join(" ");
+
+        g.append("polygon")
+          .attr("points", points)
+          .attr("fill", "none")
+          .attr("stroke", "black")
+          .attr("stroke-width", 2);
+      } else if (feature.geometry.type === "LineString") {
+        const points = feature.geometry.coordinates.map(coord =>
+          `${xScale(coord[0])},${yScale(coord[1])}`
+        ).join(" ");
+
+        g.append("polyline")
+          .attr("points", points)
+          .attr("fill", "none")
+          .attr("stroke", "black")
+          .attr("stroke-width", 2);
+      }
+    });
+
+    // Pintar los dispositivos (onts) y sus nombres
+    g.selectAll(".device")
+      .data(onts)
+      .join("g")
+      .attr("class", "device")
+      .each(function(d) {
+        d3.select(this)
+          .append("circle")
+          .attr("cx", xScale(d.x))
+          .attr("cy", yScale(d.y))
+          .attr("r", 6)
+          .attr("fill", "blue")
+          .attr("stroke", "white")
+          .attr("stroke-width", 2);
+
+        d3.select(this)
+          .append("text")
+          .attr("x", xScale(d.x))
+          .attr("y", yScale(d.y) - 10)
+          .attr("text-anchor", "middle")
+          .attr("font-size", "10px")
+          .attr("fill", "black")
+          .text(d.serial);
       });
 
-    // Implementar zoom
-    const zoom = d3.zoom()
-      .scaleExtent([1, 8])
-      .on('zoom', (event) => {
-        g.attr('transform', event.transform);
+  }, [heatmapData, geoJsonData, onts, width, height]);
+
+  const getBounds = (geoJsonData) => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    geoJsonData.features.forEach(feature => {
+      const coordinates = feature.geometry.type === "Polygon"
+        ? feature.geometry.coordinates[0]
+        : feature.geometry.coordinates;
+      coordinates.forEach(coord => {
+        minX = Math.min(minX, coord[0]);
+        minY = Math.min(minY, coord[1]);
+        maxX = Math.max(maxX, coord[0]);
+        maxY = Math.max(maxY, coord[1]);
       });
+    });
+    return [[minX, minY], [maxX, maxY]];
+  };
 
-    svg.call(zoom);
-
-  }, [heatmapData, geoJsonData, width, height, hexRadius]);
+  const sampleData = (data, sampleSize) => {
+    const step = Math.max(1, Math.floor(data.length / sampleSize));
+    return data.filter((_, i) => i % step === 0);
+  };
 
   return (
-    <div>
-      <svg ref={svgRef} width={width} height={height} />
-      <div>
-        <label htmlFor="hexRadius">Tamaño de hexágonos: </label>
-        <input
-          type="range"
-          id="hexRadius"
-          min="5"
-          max="20"
-          value={hexRadius}
-          onChange={(e) => setHexRadius(Number(e.target.value))}
-        />
-      </div>
+    <div className="bg-white shadow-lg rounded-lg p-4">
+      <svg ref={svgRef} width={width} height={height}></svg>
     </div>
   );
 };
 
-export default HeatmapD3;
+export default ContourMap;

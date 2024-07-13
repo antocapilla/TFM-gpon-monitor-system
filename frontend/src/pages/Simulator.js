@@ -117,6 +117,7 @@ const Simulator = () => {
               geoJsonData={simulationResult.result.geoJsonData}
               onts={simulationResult.result.onts}
             />
+            {/* <ContourMap width={800} height={600} /> */}
           </div>
         );
       case SIMULATION_TYPES.WIFI_CHANNEL_ALLOCATION:

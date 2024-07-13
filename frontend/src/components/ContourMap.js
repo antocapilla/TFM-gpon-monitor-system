@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
-const ContourMap = ({ heatmapData, geoJsonData, onts, width, height }) => {
+const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingImageUrl }) => {
   const svgRef = useRef(null);
 
   useEffect(() => {
@@ -10,12 +10,20 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height }) => {
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-    const margin = { top: 40, right: 100, bottom: 20, left: 20 };
+    const margin = { top: 20, right: 100, bottom: 20, left: 20 };
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
     const g = svg.append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    // Add background image
+    svg.append("image")
+      .attr("xlink:href", buildingImageUrl)
+      .attr("x", margin.left)
+      .attr("y", margin.top)
+      .attr("width", innerWidth)
+      .attr("height", innerHeight);
 
     // Calcular los límites del GeoJSON
     const bounds = getBounds(geoJsonData);
@@ -26,34 +34,36 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height }) => {
     const yScale = d3.scaleLinear().domain([y1, y0]).range([0, innerHeight]);
 
     // Crear el mapa de calor
-    const minValue = d3.min(heatmapData, d => d.value);
-    const maxValue = d3.max(heatmapData, d => d.value);
+    const heatmapPoints = heatmapData.map(d => [xScale(d.lng), yScale(d.lat), d.value]);
+    const contours = d3.contourDensity()
+      .x(d => d[0])
+      .y(d => d[1])
+      .weight(d => d[2])
+      .size([innerWidth, innerHeight])
+      .bandwidth(40) // Ajustar el ancho de banda para una mejor distribución
+      .thresholds(30)
+      (heatmapPoints);
 
-    const colorScale = d3.scaleSequential(d3.interpolateRdYlGn)
-      .domain([minValue, maxValue]);
+    // Heatmap color scale (usando colores más interesantes)
+    const heatmapColorScale = d3.scaleSequential(d3.interpolateTurbo)
+      .domain([0, d3.max(contours, d => d.value)]);
 
-    // Crear un mapa de calor usando rect elements
-    const cellWidth = innerWidth / Math.sqrt(heatmapData.length);
-    const cellHeight = innerHeight / Math.sqrt(heatmapData.length);
-
-    g.selectAll(".heat-cell")
-      .data(heatmapData)
-      .enter()
-      .append("rect")
-      .attr("class", "heat-cell")
-      .attr("x", d => xScale(d.lng))
-      .attr("y", d => yScale(d.lat))
-      .attr("width", cellWidth)
-      .attr("height", cellHeight)
-      .attr("fill", d => colorScale(d.value))
+    g.append("g")
+      .attr("fill", "none")
+      .attr("stroke", "none")
+      .selectAll("path")
+      .data(contours)
+      .join("path")
+      .attr("fill", d => heatmapColorScale(d.value))
+      .attr("d", d3.geoPath())
       .attr("opacity", 0.7);
 
     // Añadir leyenda
     const legendWidth = 20;
     const legendHeight = innerHeight / 2;
-    const legendScale = d3.scaleLinear()
-      .domain(colorScale.domain())
-      .range([legendHeight, 0]);
+    const dBmDomain = [-100, -40];
+    const legendColorScale = d3.scaleSequential(d3.interpolateTurbo).domain(dBmDomain);
+    const legendScale = d3.scaleLinear().domain(dBmDomain).range([legendHeight, 0]);
 
     const legend = svg.append("g")
       .attr("transform", `translate(${width - margin.right + 40},${margin.top + innerHeight / 4})`);
@@ -67,10 +77,10 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height }) => {
       .attr("y2", "0%");
 
     legendGradient.selectAll("stop")
-      .data(colorScale.ticks().map((t, i, n) => ({ offset: `${100*i/n.length}%`, color: colorScale(t) })))
+      .data(d3.range(dBmDomain[0], dBmDomain[1], (dBmDomain[1] - dBmDomain[0]) / 10))
       .enter().append("stop")
-      .attr("offset", d => d.offset)
-      .attr("stop-color", d => d.color);
+      .attr("offset", (d, i) => `${(i / 9) * 100}%`)
+      .attr("stop-color", d => legendColorScale(d));
 
     legend.append("rect")
       .attr("width", legendWidth)
@@ -88,7 +98,7 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height }) => {
     const legendAxis = d3.axisRight(legendScale)
       .tickSize(legendWidth)
       .ticks(5)
-      .tickFormat(d3.format(".2f"));
+      .tickFormat(d3.format("d"));
 
     legend.append("g")
       .call(legendAxis)
@@ -122,17 +132,18 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height }) => {
     // Pintar los dispositivos (onts) y sus nombres
     g.selectAll(".device")
       .data(onts)
-      .join("g")
+      .enter()
+      .append("g")
       .attr("class", "device")
-      .each(function(d) {
+      .each(function (d) {
         d3.select(this)
           .append("circle")
           .attr("cx", xScale(d.x))
           .attr("cy", yScale(d.y))
-          .attr("r", 6)
+          .attr("r", 5)
           .attr("fill", "blue")
           .attr("stroke", "white")
-          .attr("stroke-width", 2);
+          .attr("stroke-width", 1.5);
 
         d3.select(this)
           .append("text")
@@ -141,10 +152,13 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height }) => {
           .attr("text-anchor", "middle")
           .attr("font-size", "10px")
           .attr("fill", "black")
-          .text(d.serial);
+          .text(d.name);
       });
 
-  }, [heatmapData, geoJsonData, onts, width, height]);
+    legend.selectAll(".tick text")
+      .attr("x", 4)
+      .attr("dy", -2);
+  }, [heatmapData, geoJsonData, onts, width, height, buildingImageUrl]);
 
   const getBounds = (geoJsonData) => {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
