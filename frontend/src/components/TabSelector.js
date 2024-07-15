@@ -16,6 +16,14 @@ const TabSelector = ({ selectedTab, setSelectedTab }) => (
       >
         Datos Históricos
       </button>
+      <button
+        className={`px-4 py-2 rounded-r ${
+          selectedTab === 'connectivity' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-700'
+        }`}
+        onClick={() => setSelectedTab('connectivity')}
+      >
+        Conectividad
+      </button>
     </div>
   );
 

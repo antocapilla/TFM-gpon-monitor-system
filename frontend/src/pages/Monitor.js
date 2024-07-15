@@ -5,18 +5,29 @@ import Summary from '../components/Summary';
 import TabSelector from '../components/TabSelector';
 import RealtimeData from '../components/RealtimeData';
 import HistoricalData from '../components/HistoricalData';
-import ConfigurationModal from '../components/ConfigurationModal';
-import Breadcrumb from '../components/BreadCrumb';
-import DeleteConfirmationModal from '../components/DeleteConfirmationModal';
+import Connectivity from '../components/Connectivity';
+import Breadcrumb from '../components/BreadCrumb';  // Añadida esta importación
+import ConfigurationModal from '../components/ConfigurationModal';  // Añadida esta importación
+import DeleteConfirmationModal from '../components/DeleteConfirmationModal';  // Añadida esta importación
+import { Tabs, TabList, Tab, TabPanel } from 'react-tabs';
+import 'react-tabs/style/react-tabs.css';
 
 const metricLabels = {
-  totalBytesReceived: 'Bytes Recibidos',
-  totalBytesSent: 'Bytes Enviados',
-  totalWifiAssociations: 'Asociaciones WiFi',
+  totalBytesReceived: 'Bytes Recibidos WAN',
+  totalBytesSent: 'Bytes Enviados WAN',
+  totalWifiBytesReceived: 'Bytes Recibidos WiFi',
+  totalWifiBytesSent: 'Bytes Enviados WiFi',
+  totalWifiAssociations: 'Clientes Conectados WiFi',
   activeWANs: 'WANs Activas',
   activeWiFiInterfaces: 'Interfaces WiFi Activas',
   connectedHosts: 'Hosts Conectados',
+  failedConnections: 'Conexiones Fallidas',
+  deviceCount: 'Número de ONTs',
+  avgTransceiverTemperature: 'Temperatura Promedio GPON (°C)',
+  avgRxPower: 'Potencia Promedio Rx (dBm)',
+  avgTxPower: 'Potencia Promedio Tx (dBm)',
 };
+
 
 function Monitor() {
   const [tableData, setTableData] = useState([]);
@@ -37,6 +48,7 @@ function Monitor() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedHistoricalMetric, setSelectedHistoricalMetric] = useState(Object.keys(metricLabels)[0]);
   const [selectedMetrics, setSelectedMetrics] = useState(Object.keys(metricLabels));
+  const [activeTab, setActiveTab] = useState(0);
 
 
   useEffect(() => {
@@ -191,9 +203,15 @@ function Monitor() {
     }
   };
 
+  const handleTabSelect = (index) => {
+    const tabs = ['realtime', 'historical', 'connectivity'];
+    setSelectedTab(tabs[index]);
+    setActiveTab(index);
+  };
+
   return (
-    <div className="container mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Monitorización</h1>
+    <div className="container mx-auto p-4 bg-gray-100">
+      <h1 className="text-3xl font-bold mb-6 text-gray-800">Monitorización de Red</h1>
 
       <Breadcrumb
         currentLevel={currentLevel}
@@ -203,52 +221,97 @@ function Monitor() {
         handleBreadcrumbClick={handleBreadcrumbClick}
       />
 
-      <Summary
-        latestValues={latestValues}
-        selectedMetrics={selectedMetrics}
-        metricLabels={metricLabels}
-      />
+      <Tabs selectedIndex={['realtime', 'historical', 'connectivity'].indexOf(selectedTab)} onSelect={handleTabSelect}>
+        <TabList className="flex mb-4" >
+        <Tab className={`px-4 py-2 rounded-t-lg mr-2 cursor-pointer ${activeTab === 0 ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-800'}`}>Tiempo Real</Tab>
+        <Tab className={`px-4 py-2 rounded-t-lg mr-2 cursor-pointer ${activeTab === 1 ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-800'}`}>Histórico</Tab>
+        <Tab className={`px-4 py-2 rounded-t-lg mr-2 cursor-pointer ${activeTab === 2 ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-800'}`}>Conectividad</Tab>
+        </TabList>
+        
 
-      <TabSelector selectedTab={selectedTab} setSelectedTab={setSelectedTab} />
+        <TabPanel>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <Summary
+              latestValues={latestValues}
+              selectedMetrics={selectedMetrics}
+              metricLabels={metricLabels}
+              currentLevel={selectedBuilding || selectedFloor || selectedONT}
+            />
+            <RealtimeData
+              tableData={tableData}
+              selectedMetrics={selectedMetrics}
+              metricLabels={metricLabels}
+              setSelectedMetrics={setSelectedMetrics}
+              handleItemClick={handleItemClick}
+              configuration={configuration}
+              setConfiguration={setConfiguration}
+              handleConfigSave={handleConfigSave}
+              isModalOpen={isModalOpen}
+              setIsModalOpen={setIsModalOpen}
+              isDeleteModalOpen={isDeleteModalOpen}
+              setIsDeleteModalOpen={setIsDeleteModalOpen}
+              currentLevel={currentLevel}
+              selectedBuilding={selectedBuilding}
+              selectedFloor={selectedFloor}
+              selectedONT={selectedONT}
+              handleDelete={handleDelete}
+            />
+          </div>
+        </TabPanel>
 
-      {selectedTab === 'realtime' && (
-        <RealtimeData
-          tableData={tableData}
-          selectedMetrics={selectedMetrics}
-          metricLabels={metricLabels}
-          setSelectedMetrics={setSelectedMetrics}
-          handleItemClick={handleItemClick}
+        <TabPanel>
+          <div className="bg-white p-4 rounded-lg shadow">
+            {/* <Summary
+              latestValues={latestValues}
+              selectedMetrics={selectedMetrics}
+              metricLabels={metricLabels}
+            /> */}
+            <HistoricalData
+              isLoading={isLoading}
+              error={error}
+              timeSeriesData={timeSeriesData}
+              startDate={startDate}
+              setStartDate={setStartDate}
+              endDate={endDate}
+              setEndDate={setEndDate}
+              selectedMetric={selectedHistoricalMetric}
+              metricLabels={metricLabels}
+              formatTimestamp={formatTimestamp}
+              setSelectedHistoricalMetric={setSelectedHistoricalMetric}
+            />
+          </div>
+        </TabPanel>
 
-          // Configuración y Borrado en RealtimeData
+        <TabPanel>
+          <Connectivity 
+            level={currentLevel}
+            building={selectedBuilding}
+            floor={selectedFloor}
+            ont={selectedONT}
+          />
+        </TabPanel>
+      </Tabs>
+
+      {/* Modales */}
+      {isModalOpen && (
+        <ConfigurationModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
           configuration={configuration}
           setConfiguration={setConfiguration}
           handleConfigSave={handleConfigSave}
-          isModalOpen={isModalOpen}
-          setIsModalOpen={setIsModalOpen}
-          isDeleteModalOpen={isDeleteModalOpen}
-          setIsDeleteModalOpen={setIsDeleteModalOpen}
-          currentLevel={currentLevel}
-          selectedBuilding={selectedBuilding}
-          selectedFloor={selectedFloor}
-          selectedONT={selectedONT}
-          handleDelete={handleDelete}
         />
       )}
 
-      {selectedTab === 'historical' && (
-        <HistoricalData
-          isLoading={isLoading}
-          error={error}
-          timeSeriesData={timeSeriesData}
-          startDate={startDate}
-          setStartDate={setStartDate}
-          endDate={endDate}
-          setEndDate={setEndDate}
-          selectedMetric={selectedHistoricalMetric}
-          metricLabels={metricLabels}
-          formatTimestamp={formatTimestamp}
-
-          setSelectedHistoricalMetric={setSelectedHistoricalMetric}
+      {isDeleteModalOpen && (
+        <DeleteConfirmationModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          onConfirm={handleDelete}
+          level={currentLevel}
+          building={selectedBuilding}
+          floor={selectedFloor}
+          ont={selectedONT}
         />
       )}
     </div>

@@ -1,6 +1,6 @@
-const Summary = ({ latestValues, selectedMetrics, metricLabels }) => (
+const Summary = ({ latestValues, selectedMetrics, metricLabels, currentLevel }) => (
     <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-      <h2 className="text-xl font-bold mb-2">Resumen</h2>
+      <h2 className="text-xl font-bold mb-2">Resumen: {currentLevel}</h2>
       <div className="grid grid-cols-3 gap-4">
         {selectedMetrics.map((key) => (
           latestValues[key] !== undefined && (

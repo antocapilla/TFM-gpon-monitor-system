@@ -23,7 +23,44 @@ const RealtimeData = ({
 }) => {
     return (
         <div className="bg-white rounded-lg shadow-md p-4 mb-4">
-            <h2 className="text-xl font-bold mb-2">Datos en Tiempo Real</h2>
+            <h2 className="text-3xl font-bold mb-6 text-gray-800">Datos en Tiempo Real</h2>
+
+            
+
+            {/* Data Table */}
+            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"> 
+                <table className="table-auto w-full whitespace-nowrap"> {/* Apply whitespace-nowrap to the table */}
+                    <thead>
+                        <tr>
+                            <th className="px-4 py-2 sticky left-0 bg-white w-fit">ID</th>
+                            {selectedMetrics.map((metric) => (
+                                <th key={metric} className="px-4 py-2">
+                                    {metricLabels[metric]}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {tableData.map((item) => (
+                            <tr
+                                key={item._id || item.name || item.serial}
+                                className="cursor-pointer hover:bg-gray-100 py-2"
+                                onClick={() => handleItemClick(item)}
+                            >
+                                <td className="border px-4 py-2 align-middle">{item._id || item.name || item.serial}</td>
+                                {selectedMetrics.map((metric) => (
+                                    <td key={metric} className="border px-4 py-2 align-middle">
+                                        <div className="truncate max-w-[150px]"> {/* Limit width and truncate */}
+                                            {item[metric]}
+                                        </div>
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+                <div className="h-4"></div> {/* Add spacing below the table */}
+            </div> 
 
             {/* Buttons */}
             <div className="mb-4 flex justify-end space-x-2">
@@ -40,36 +77,6 @@ const RealtimeData = ({
                     Configuración
                 </button>
             </div>
-
-            {/* Data Table */}
-            <table className="table-auto w-full">
-                <thead>
-                    <tr>
-                        <th className="px-4 py-2">ID</th>
-                        {selectedMetrics.map((metric) => (
-                            <th key={metric} className="px-4 py-2">
-                                {metricLabels[metric]} 
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {tableData.map((item) => (
-                        <tr
-                            key={item._id || item.name || item.serial}
-                            className="cursor-pointer hover:bg-gray-100"
-                            onClick={() => handleItemClick(item)}
-                        >
-                            <td className="border px-4 py-2">{item._id || item.name || item.serial}</td>
-                            {selectedMetrics.map((metric) => (
-                                <td key={metric} className="border px-4 py-2">
-                                    {item[metric]}
-                                </td>
-                            ))}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
 
             {/* Configuration Modal */}
             <ConfigurationModal
