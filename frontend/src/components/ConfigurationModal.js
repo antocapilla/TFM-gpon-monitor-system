@@ -1,6 +1,12 @@
 const ConfigurationModal = ({ isOpen, onClose, configuration, setConfiguration, selectedMetrics, setSelectedMetrics, metricLabels, handleConfigSave }) => {
   if (!isOpen) return null;
 
+  // Verificar si configuration es undefined o null
+  if (!configuration) {
+    console.error('Configuration object is undefined or null');
+    return null;
+  }
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
       <div className="bg-white rounded-lg shadow-md p-6">
@@ -13,7 +19,7 @@ const ConfigurationModal = ({ isOpen, onClose, configuration, setConfiguration, 
             type="number"
             id="collectionInterval"
             className="w-full p-2 border border-gray-300 rounded-md"
-            value={configuration.interval}
+            value={configuration.interval || ''}
             onChange={(e) => setConfiguration({...configuration, interval: parseInt(e.target.value)})}
           />
         </div>
@@ -32,7 +38,7 @@ const ConfigurationModal = ({ isOpen, onClose, configuration, setConfiguration, 
               )
             }
           >
-            {Object.entries(metricLabels).map(([key, label]) => (
+            {Object.entries(metricLabels || {}).map(([key, label]) => (
               <option key={key} value={key}>
                 {label}
               </option>

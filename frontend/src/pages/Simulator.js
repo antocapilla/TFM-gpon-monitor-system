@@ -28,6 +28,21 @@ const Simulator = () => {
     fetchData();
   }, []);
 
+  const generateRandomChannelAllocation = (onts) => {
+    const channels2_4GHz = [1, 6, 11]; // Canales no superpuestos en 2.4 GHz
+    const channels5GHz = [36, 40, 44, 48, 52, 56, 60, 64]; // Algunos canales comunes en 5 GHz
+    
+    return onts.map(ont => ({
+      serial: ont.serial,
+      status: Math.random() > 0.1 ? 'Online' : 'Offline',
+      channel2_4: channels2_4GHz[Math.floor(Math.random() * channels2_4GHz.length)],
+      channel5: channels5GHz[Math.floor(Math.random() * channels5GHz.length)],
+      connectedClients: Math.floor(Math.random() * 20),
+      signalStrength2_4: -Math.floor(Math.random() * 30 + 50), // Entre -50 y -80 dBm
+      signalStrength5: -Math.floor(Math.random() * 20 + 40), // Entre -40 y -60 dBm
+    }));
+  };
+
   const handleBuildingChange = (e) => {
     setSelectedBuilding(e.target.value);
     setSelectedFloor('');
@@ -120,7 +135,8 @@ const Simulator = () => {
             {/* <ContourMap width={800} height={600} /> */}
           </div>
         );
-      case SIMULATION_TYPES.WIFI_CHANNEL_ALLOCATION:
+        case SIMULATION_TYPES.WIFI_CHANNEL_ALLOCATION:
+        const channelAllocation = generateRandomChannelAllocation(simulationResult.result.onts);
         return (
           <div className="mt-4">
             <h3 className="text-xl font-semibold mb-4">Asignación de canales WiFi</h3>
@@ -128,38 +144,56 @@ const Simulator = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Seleccionar
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ONT ID
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Estado
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Canal WiFi
+                    Canal 2.4 GHz
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Canal 5 GHz
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Clientes Conectados
                   </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Intensidad de Señal (dBm)
-                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {simulationResult.map((result, index) => (
+                {channelAllocation.map((result, index) => (
                   <tr key={index}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        className="form-checkbox h-5 w-5 text-blue-600"
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">{result.serial}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${result.status === 'Online' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                         {result.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">{result.channel}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{result.channel2_4}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{result.channel5}</td>
                     <td className="px-6 py-4 whitespace-nowrap">{result.connectedClients}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{result.signalStrength}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            
+            {/* Botón de mock añadido aquí */}
+            <div className="mt-4 flex justify-center">
+              <button
+                className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+              >
+                Enviar configuración a dispositivos
+              </button>
+            </div>
           </div>
         );
       default:

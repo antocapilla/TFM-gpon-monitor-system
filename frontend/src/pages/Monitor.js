@@ -17,7 +17,7 @@ const metricLabels = {
   totalBytesSent: 'Bytes Enviados WAN',
   totalWifiBytesReceived: 'Bytes Recibidos WiFi',
   totalWifiBytesSent: 'Bytes Enviados WiFi',
-  totalWifiAssociations: 'Clientes Conectados WiFi',
+  // totalWifiAssociations: 'Clientes Conectados WiFi',
   activeWANs: 'WANs Activas',
   activeWiFiInterfaces: 'Interfaces WiFi Activas',
   connectedHosts: 'Hosts Conectados',
@@ -42,7 +42,7 @@ function Monitor() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [configuration, setConfiguration] = useState({});
+  const [configuration, setConfiguration] = useState({ interval: 300, enabled: true });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -57,9 +57,10 @@ function Monitor() {
         const buildingData = await getBuildingData();
         setBuildings(buildingData);
         const config = await getMonitoringConfig();
-        setConfiguration(config);
+        setConfiguration(config || { interval: 300, enabled: true });
       } catch (error) {
         console.error("Error fetching initial data:", error);
+        setConfiguration({ interval: 300, enabled: true });
       }
     };
     fetchData();
@@ -293,15 +294,17 @@ function Monitor() {
       </Tabs>
 
       {/* Modales */}
-      {isModalOpen && (
-        <ConfigurationModal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          configuration={configuration}
-          setConfiguration={setConfiguration}
-          handleConfigSave={handleConfigSave}
-        />
-      )}
+      {isModalOpen && configuration && (
+      <ConfigurationModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        configuration={configuration}
+        setConfiguration={setConfiguration}
+        handleConfigSave={handleConfigSave}
+        selectedMetrics={selectedMetrics}
+        setSelectedMetrics={setSelectedMetrics}
+      />
+    )}
 
       {isDeleteModalOpen && (
         <DeleteConfirmationModal
