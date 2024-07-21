@@ -31,7 +31,7 @@ This project is an advanced management and monitoring system for Gigabit Passive
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/gpon-management-system.git
+   git clone https://github.com/antocapilla/TFM.git
    cd gpon-management-system
    ```
 
