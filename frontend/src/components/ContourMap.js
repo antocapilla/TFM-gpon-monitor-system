@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
-const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingImageUrl }) => {
+const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingImageUrl, cellSize, valueRange }) => {
   const svgRef = useRef(null);
 
   useEffect(() => {
@@ -33,36 +33,29 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
     const xScale = d3.scaleLinear().domain([x0, x1]).range([0, innerWidth]);
     const yScale = d3.scaleLinear().domain([y1, y0]).range([0, innerHeight]);
 
-    // Crear el mapa de calor
-    const heatmapPoints = heatmapData.map(d => [xScale(d.lng), yScale(d.lat), d.value]);
-    const contours = d3.contourDensity()
-      .x(d => d[0])
-      .y(d => d[1])
-      .weight(d => d[2])
-      .size([innerWidth, innerHeight])
-      .bandwidth(40) // Ajustar el ancho de banda para una mejor distribución
-      .thresholds(30)
-      (heatmapPoints);
+    // Dominio de color en dBm (señal recibida). Valores altos = mejor señal = cálido.
+    const dBmDomain = (valueRange && valueRange.length === 2) ? valueRange : [-90, -30];
+    const heatmapColorScale = d3.scaleSequential(d3.interpolateTurbo).domain(dBmDomain);
 
-    // Heatmap color scale (usando colores más interesantes)
-    const heatmapColorScale = d3.scaleSequential(d3.interpolateTurbo)
-      .domain([0, d3.max(contours, d => d.value)]);
+    // Mapa de calor como ráster: una celda coloreada por cada punto de la rejilla.
+    const cellW = cellSize ? Math.abs(xScale(x0 + cellSize) - xScale(x0)) : innerWidth / 40;
+    const cellH = cellSize ? Math.abs(yScale(y0 + cellSize) - yScale(y0)) : innerHeight / 40;
 
     g.append("g")
-      .attr("fill", "none")
-      .attr("stroke", "none")
-      .selectAll("path")
-      .data(contours)
-      .join("path")
+      .selectAll("rect")
+      .data(heatmapData)
+      .join("rect")
+      .attr("x", d => xScale(d.lng) - cellW / 2)
+      .attr("y", d => yScale(d.lat) - cellH / 2)
+      .attr("width", cellW + 1)
+      .attr("height", cellH + 1)
       .attr("fill", d => heatmapColorScale(d.value))
-      .attr("d", d3.geoPath())
-      .attr("opacity", 0.7);
+      .attr("opacity", 0.65);
 
     // Añadir leyenda
     const legendWidth = 20;
     const legendHeight = innerHeight / 2;
-    const dBmDomain = [-100, -40];
-    const legendColorScale = d3.scaleSequential(d3.interpolateTurbo).domain(dBmDomain);
+    const legendColorScale = heatmapColorScale;
     const legendScale = d3.scaleLinear().domain(dBmDomain).range([legendHeight, 0]);
 
     const legend = svg.append("g")
@@ -158,7 +151,7 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
     legend.selectAll(".tick text")
       .attr("x", 4)
       .attr("dy", -2);
-  }, [heatmapData, geoJsonData, onts, width, height, buildingImageUrl]);
+  }, [heatmapData, geoJsonData, onts, width, height, buildingImageUrl, cellSize, valueRange]);
 
   const getBounds = (geoJsonData) => {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;

@@ -6,8 +6,8 @@ schedule
 python-multipart
 python-socketio
 numpy
-scipy
-matplotlib
-pygame
-pyqtree
-tqdm
+networkx
+# Motor de ray tracing para la simulación de propagación (Sionna RT 2.x).
+# Pesado (Mitsuba 3 + Dr.Jit + TensorFlow/PyTorch); se beneficia de GPU.
+# Si no se instala, el backend usa automáticamente el modelo analítico multi-pared.
+sionna-rt

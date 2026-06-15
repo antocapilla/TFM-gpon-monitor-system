@@ -28,21 +28,6 @@ const Simulator = () => {
     fetchData();
   }, []);
 
-  const generateRandomChannelAllocation = (onts) => {
-    const channels2_4GHz = [1, 6, 11]; // Canales no superpuestos en 2.4 GHz
-    const channels5GHz = [36, 40, 44, 48, 52, 56, 60, 64]; // Algunos canales comunes en 5 GHz
-    
-    return onts.map(ont => ({
-      serial: ont.serial,
-      status: Math.random() > 0.1 ? 'Online' : 'Offline',
-      channel2_4: channels2_4GHz[Math.floor(Math.random() * channels2_4GHz.length)],
-      channel5: channels5GHz[Math.floor(Math.random() * channels5GHz.length)],
-      connectedClients: Math.floor(Math.random() * 20),
-      signalStrength2_4: -Math.floor(Math.random() * 30 + 50), // Entre -50 y -80 dBm
-      signalStrength5: -Math.floor(Math.random() * 20 + 40), // Entre -40 y -60 dBm
-    }));
-  };
-
   const handleBuildingChange = (e) => {
     setSelectedBuilding(e.target.value);
     setSelectedFloor('');
@@ -76,45 +61,6 @@ const Simulator = () => {
     }
   };
 
-  const generateFakeHeatmapData = (geoJsonData, onts) => {
-    const bounds = getBounds(geoJsonData);
-    const [[x0, y0], [x1, y1]] = bounds;
-    const points = [];
-    const numPoints = 1000;
-
-    for (let i = 0; i < numPoints; i++) {
-      const lng = x0 + Math.random() * (x1 - x0);
-      const lat = y0 + Math.random() * (y1 - y0);
-
-      let maxIntensity = 0;
-      onts.forEach(ont => {
-        const distance = Math.sqrt(Math.pow(lng - ont.x, 2) + Math.pow(lat - ont.y, 2));
-        const intensity = Math.max(0, 1 - distance / 200);  // 200 unidades de distancia máxima
-        maxIntensity = Math.max(maxIntensity, intensity);
-      });
-
-      points.push({ lng, lat, value: maxIntensity });
-    }
-
-    return points;
-  };
-
-  const getBounds = (geoJsonData) => {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    geoJsonData.features.forEach(feature => {
-      const coordinates = feature.geometry.type === "Polygon" 
-        ? feature.geometry.coordinates[0] 
-        : feature.geometry.coordinates;
-      coordinates.forEach(coord => {
-        minX = Math.min(minX, coord[0]);
-        minY = Math.min(minY, coord[1]);
-        maxX = Math.max(maxX, coord[0]);
-        maxY = Math.max(maxY, coord[1]);
-      });
-    });
-    return [[minX, minY], [maxX, maxY]];
-  };
-
   const renderSimulationResult = () => {
     if (!simulationResult || !simulationResult.result) return null;
 
@@ -125,18 +71,24 @@ const Simulator = () => {
         return (
           <div className="mt-4 text-center">
             <h3 className="text-xl font-semibold mb-4">Mapa de propagación de señal</h3>
-            <ContourMap 
-              width={800} 
-              height={600} 
+            <ContourMap
+              width={800}
+              height={600}
               heatmapData={simulationResult.result.heatmapData}
               geoJsonData={simulationResult.result.geoJsonData}
               onts={simulationResult.result.onts}
+              cellSize={simulationResult.result.cellSize}
+              valueRange={simulationResult.result.valueRange}
             />
-            {/* <ContourMap width={800} height={600} /> */}
+            {simulationResult.result.engine && (
+              <p className="text-xs text-gray-500 mt-2">
+                Motor: {simulationResult.result.engine === 'sionna' ? 'Sionna RT (ray tracing)' : 'Modelo analítico multi-pared'}
+              </p>
+            )}
           </div>
         );
         case SIMULATION_TYPES.WIFI_CHANNEL_ALLOCATION:
-        const channelAllocation = generateRandomChannelAllocation(simulationResult.result.onts);
+        const channelAllocation = simulationResult.result.channelAllocation || [];
         return (
           <div className="mt-4">
             <h3 className="text-xl font-semibold mb-4">Asignación de canales WiFi</h3>
@@ -159,7 +111,7 @@ const Simulator = () => {
                     Canal 5 GHz
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Clientes Conectados
+                    Vecinos interferentes
                   </th>
                 </tr>
               </thead>
@@ -180,7 +132,7 @@ const Simulator = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">{result.channel2_4}</td>
                     <td className="px-6 py-4 whitespace-nowrap">{result.channel5}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">{result.connectedClients}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">{result.interferenceNeighbors}</td>
                   </tr>
                 ))}
               </tbody>
