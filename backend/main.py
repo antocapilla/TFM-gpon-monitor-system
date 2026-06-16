@@ -1,4 +1,4 @@
-from config import FRONTEND_URL
+from config import CORS_ORIGINS
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,10 +19,13 @@ logger = logging.getLogger("pymongo").setLevel(logging.WARNING)
 
 app = FastAPI()
 
+allowed_origins = [origin.strip() for origin in CORS_ORIGINS.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL],
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    # allow_credentials debe ser False cuando se permite cualquier origen ("*").
+    allow_credentials="*" not in allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

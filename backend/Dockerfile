@@ -23,4 +23,5 @@ RUN mkdir -p uploads
 # Asegurarse de que el directorio tenga los permisos correctos
 RUN chmod 777 uploads
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Usa el puerto que asigne la plataforma ($PORT) o 8000 en local.
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
