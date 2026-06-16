@@ -17,13 +17,15 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
     const g = svg.append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // Add background image
-    svg.append("image")
-      .attr("xlink:href", buildingImageUrl)
-      .attr("x", margin.left)
-      .attr("y", margin.top)
-      .attr("width", innerWidth)
-      .attr("height", innerHeight);
+    // Add background image (optional)
+    if (buildingImageUrl) {
+      svg.append("image")
+        .attr("xlink:href", buildingImageUrl)
+        .attr("x", margin.left)
+        .attr("y", margin.top)
+        .attr("width", innerWidth)
+        .attr("height", innerHeight);
+    }
 
     // Calcular los límites del GeoJSON
     const bounds = getBounds(geoJsonData);
@@ -34,7 +36,10 @@ const ContourMap = ({ heatmapData, geoJsonData, onts, width, height, buildingIma
     const yScale = d3.scaleLinear().domain([y1, y0]).range([0, innerHeight]);
 
     // Dominio de color en dBm (señal recibida). Valores altos = mejor señal = cálido.
-    const dBmDomain = (valueRange && valueRange.length === 2) ? valueRange : [-90, -30];
+    let dBmDomain = (valueRange && valueRange.length === 2) ? valueRange : [-90, -30];
+    if (dBmDomain[0] === dBmDomain[1]) {
+      dBmDomain = [dBmDomain[0] - 1, dBmDomain[1] + 1]; // evitar dominio degenerado
+    }
     const heatmapColorScale = d3.scaleSequential(d3.interpolateTurbo).domain(dBmDomain);
 
     // Mapa de calor como ráster: una celda coloreada por cada punto de la rejilla.

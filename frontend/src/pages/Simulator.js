@@ -52,10 +52,8 @@ const Simulator = () => {
     try {
       const result = await runSimulation(selectedBuilding, selectedFloor, selectedSimulation);
       setSimulationResult(result);
-      // console.log("Simulation result:", result); // For debugging
     } catch (err) {
       setError('Error al ejecutar la simulación. Por favor, intente nuevamente.');
-      console.error("Simulation error:", err); // For debugging
     } finally {
       setIsLoading(false);
     }
@@ -63,8 +61,6 @@ const Simulator = () => {
 
   const renderSimulationResult = () => {
     if (!simulationResult || !simulationResult.result) return null;
-
-    console.log("Simulation Result:", simulationResult);
 
     switch (selectedSimulation) {
       case SIMULATION_TYPES.SIGNAL_PROPAGATION:

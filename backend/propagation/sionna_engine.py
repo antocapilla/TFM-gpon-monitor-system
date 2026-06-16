@@ -10,6 +10,7 @@ se beneficia mucho de GPU. Si no está instalado, :func:`is_available` devuelve
 """
 from __future__ import annotations
 
+import importlib.util
 from typing import List, Tuple
 
 import numpy as np
@@ -20,11 +21,8 @@ from . import scene_builder
 
 
 def is_available() -> bool:
-    try:
-        import sionna.rt  # noqa: F401
-        return True
-    except Exception:
-        return False
+    """¿Está instalado Sionna RT? (sin importar la librería pesada)."""
+    return importlib.util.find_spec("sionna.rt") is not None
 
 
 def compute_radio_map(
